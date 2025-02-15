@@ -3,6 +3,7 @@ import type { Database } from '../types/supabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseSchema = import.meta.env.VITE_SUPABASE_SCHEMA || 'public';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
@@ -18,14 +19,18 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     headers: {
       'x-application-name': 'quimicinter-erp'
     }
+  },
+  db: {
+    schema: supabaseSchema
   }
 });
 
 // Helper function to create a query builder with the correct schema
 export const createSchemaBuilder = (table: string) => {
-  return supabase.from(table);
+  return supabase.from(table).schema(supabaseSchema);
 };
 
+// Auth functions that use the correct schema
 export const signUp = async (email: string, password: string, fullName: string) => {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -53,8 +58,7 @@ export const signOut = async () => {
 };
 
 export const getProfile = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data, error } = await createSchemaBuilder('profiles')
     .select('*')
     .eq('id', userId)
     .single();
@@ -62,8 +66,7 @@ export const getProfile = async (userId: string) => {
 };
 
 export const updateProfile = async (userId: string, updates: any) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data, error } = await createSchemaBuilder('profiles')
     .update(updates)
     .eq('id', userId);
   return { data, error };
@@ -75,8 +78,7 @@ export const getInventoryItems = async (
   page = 1,
   limit = 10
 ) => {
-  let query = supabase
-    .from('inventory_items')
+  let query = createSchemaBuilder('inventory_items')
     .select('*, inventory_categories(name)', { count: 'exact' });
 
   if (search) {
@@ -95,8 +97,7 @@ export const getInventoryItems = async (
 };
 
 export const createInventoryItem = async (item: any) => {
-  const { data, error } = await supabase
-    .from('inventory_items')
+  const { data, error } = await createSchemaBuilder('inventory_items')
     .insert([{ ...item, created_by: supabase.auth.getUser()?.id }])
     .select()
     .single();
@@ -104,8 +105,7 @@ export const createInventoryItem = async (item: any) => {
 };
 
 export const updateInventoryItem = async (id: string, updates: any) => {
-  const { data, error } = await supabase
-    .from('inventory_items')
+  const { data, error } = await createSchemaBuilder('inventory_items')
     .update({ ...updates, updated_by: supabase.auth.getUser()?.id })
     .eq('id', id)
     .select()
@@ -114,8 +114,7 @@ export const updateInventoryItem = async (id: string, updates: any) => {
 };
 
 export const createInventoryMovement = async (movement: any) => {
-  const { data: item } = await supabase
-    .from('inventory_items')
+  const { data: item } = await createSchemaBuilder('inventory_items')
     .select('current_stock')
     .eq('id', movement.item_id)
     .single();
