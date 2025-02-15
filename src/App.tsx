@@ -2,9 +2,15 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginForm from './components/auth/LoginForm';
 import UserManagement from './components/admin/UserManagement';
+import Dashboard from './components/Dashboard';
 import InventoryList from './components/inventory/InventoryList';
 import CustomerList from './components/customers/CustomerList';
 import InvoiceList from './components/billing/InvoiceList';
+import FinanceOverview from './components/finance/FinanceOverview';
+import ComplianceOverview from './components/compliance/ComplianceOverview';
+import PayablesList from './components/payables/PayablesList';
+import ExpenseList from './components/payables/ExpenseList';
+import ProfilePage from './components/profile/ProfilePage';
 import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
 
@@ -27,6 +33,26 @@ function App() {
         } />
         
         <Route path="/dashboard" element={
+          user ? (
+            <Layout>
+              <Dashboard />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/profile" element={
+          user ? (
+            <Layout>
+              <ProfilePage />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/usuarios" element={
           user ? (
             <Layout>
               <UserManagement />
@@ -60,6 +86,46 @@ function App() {
           user ? (
             <Layout>
               <InvoiceList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/finanzas" element={
+          user ? (
+            <Layout>
+              <FinanceOverview />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/cuentas-por-pagar" element={
+          user ? (
+            <Layout>
+              <PayablesList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/gastos" element={
+          user ? (
+            <Layout>
+              <ExpenseList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/cumplimiento" element={
+          user ? (
+            <Layout>
+              <ComplianceOverview />
             </Layout>
           ) : (
             <Navigate to="/login" replace />

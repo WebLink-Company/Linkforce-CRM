@@ -11,15 +11,20 @@ export default function UserManagement() {
   const [filtroRol, setFiltroRol] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const loadUsers = async () => {
     try {
-      const { data: profiles, error } = await supabase
+      setError(null);
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (profilesError) {
+        throw profilesError;
+      }
 
       const formattedUsers = profiles.map(profile => ({
         id: profile.id,
@@ -35,6 +40,7 @@ export default function UserManagement() {
       setUsuarios(formattedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setError(error instanceof Error ? error.message : 'Error al cargar los usuarios');
     } finally {
       setLoading(false);
     }
@@ -43,6 +49,26 @@ export default function UserManagement() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  const handleDelete = async (userId: string) => {
+    if (!window.confirm('¿Está seguro que desea eliminar este usuario?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'inactive' })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      await loadUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setError(error instanceof Error ? error.message : 'Error al eliminar el usuario');
+    }
+  };
 
   const usuariosFiltrados = usuarios.filter(usuario => {
     const coincideBusqueda = 
@@ -85,6 +111,12 @@ export default function UserManagement() {
 
       <CreateAdminUser />
 
+      {error && (
+        <div className="mt-4 bg-red-50 p-4 rounded-md">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col">
         <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
@@ -116,10 +148,8 @@ export default function UserManagement() {
                 >
                   <option value="todos">Todos los roles</option>
                   <option value="admin">Administrador</option>
-                  <option value="ventas">Ventas</option>
-                  <option value="produccion">Producción</option>
-                  <option value="finanzas">Finanzas</option>
-                  <option value="calidad">Calidad</option>
+                  <option value="manager">Gerente</option>
+                  <option value="user">Usuario</option>
                 </select>
               </div>
 
@@ -205,6 +235,7 @@ export default function UserManagement() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleDelete(usuario.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="h-4 w-4" />

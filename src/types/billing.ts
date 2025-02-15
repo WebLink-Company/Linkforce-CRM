@@ -26,6 +26,9 @@ export interface Invoice {
   updated_at: string;
   voided_at?: string;
   voided_reason?: string;
+  customer?: Customer;
+  items?: InvoiceItem[];
+  payments?: Payment[];
 }
 
 export interface InvoiceItem {
@@ -39,6 +42,32 @@ export interface InvoiceItem {
   discount_rate: number;
   discount_amount: number;
   total_amount: number;
+  product?: {
+    id: string;
+    name: string;
+    code: string;
+    unit_measure: string;
+  };
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  requires_reference: boolean;
+  is_active: boolean;
+}
+
+export interface PaymentTerm {
+  id: string;
+  name: string;
+  code: string;
+  days: number;
+  description?: string;
+  discount_percentage: number;
+  discount_days: number;
+  is_active: boolean;
 }
 
 export interface Payment {
@@ -49,20 +78,75 @@ export interface Payment {
   reference_number?: string;
   payment_date: string;
   notes?: string;
+  created_by: string;
+  created_at: string;
+  payment_method?: PaymentMethod;
 }
 
-export interface PaymentMethod {
+export interface Account {
   id: string;
-  name: string;
   code: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  parent_id?: string;
+  description?: string;
   is_active: boolean;
 }
 
-export interface FiscalPeriod {
+export interface AccountMovement {
   id: string;
-  start_date: string;
-  end_date: string;
-  is_closed: boolean;
-  closed_at?: string;
-  closed_by?: string;
+  account_id: string;
+  date: string;
+  type: 'debit' | 'credit';
+  amount: number;
+  reference_type: string;
+  reference_id: string;
+  description?: string;
+  created_by: string;
+  created_at: string;
+  account?: Account;
+}
+
+export interface PriceList {
+  id: string;
+  name: string;
+  description?: string;
+  type: 'sale' | 'purchase';
+  currency: string;
+  is_active: boolean;
+  valid_from?: string;
+  valid_to?: string;
+}
+
+export interface PriceListItem {
+  id: string;
+  price_list_id: string;
+  product_id: string;
+  price: number;
+  min_quantity: number;
+}
+
+export interface Discount {
+  id: string;
+  name: string;
+  description?: string;
+  type: 'percentage' | 'amount';
+  value: number;
+  min_amount?: number;
+  min_quantity?: number;
+  customer_category_id?: string;
+  product_id?: string;
+  valid_from?: string;
+  valid_to?: string;
+  is_active: boolean;
+}
+
+export interface PaymentReminder {
+  id: string;
+  invoice_id: string;
+  reminder_date: string;
+  type: 'first' | 'second' | 'final';
+  status: 'pending' | 'sent' | 'cancelled';
+  sent_at?: string;
+  sent_by?: string;
 }
