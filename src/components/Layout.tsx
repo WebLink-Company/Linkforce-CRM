@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User } from 'lucide-react';
+import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User, UserCircle2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../lib/auth';
 import { useAuth } from '../hooks/useAuth';
@@ -112,6 +112,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link to="/inventario" className={linkClasses('/inventario')}>
                   <Package className="h-5 w-5" />
                   <span>Inventario</span>
+                </Link>
+              </li>
+
+              <li>
+                <Link to="/clientes" className={linkClasses('/clientes')}>
+                  <UserCircle2 className="h-5 w-5" />
+                  <span>Clientes</span>
                 </Link>
               </li>
               
