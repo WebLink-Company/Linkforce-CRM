@@ -1,4 +1,5 @@
-import { supabase } from '../supabase';
+import { BaseAPI } from './base';
+import { createSchemaBuilder } from '../supabase';
 import type { 
   InventoryItem, 
   InventoryTransaction,
@@ -6,13 +7,14 @@ import type {
   Warehouse 
 } from '../../types/erp';
 
-export const inventoryAPI = {
+class InventoryAPI extends BaseAPI {
+  constructor() {
+    super('inventory_items');
+  }
+
   // Inventory Items
   async getInventoryItems(search?: string, categoryId?: string) {
-    let query = supabase
-      .from('inventory_items')
-      .select('*')
-      .order('name');
+    let query = this.query.select('*').order('name');
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
@@ -24,68 +26,57 @@ export const inventoryAPI = {
 
     const { data, error } = await query;
     return { data, error };
-  },
+  }
 
   async createInventoryItem(item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .insert([{
-        ...item,
-        created_by: supabase.auth.getUser()?.id
-      }])
-      .select()
-      .single();
-    return { data, error };
-  },
+    return this.create({
+      ...item,
+      created_by: (await supabase.auth.getUser()).data.user?.id
+    });
+  }
 
   async updateInventoryItem(id: string, updates: Partial<InventoryItem>) {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .update({
-        ...updates,
-        updated_by: supabase.auth.getUser()?.id
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    return { data, error };
-  },
+    return this.update(id, {
+      ...updates,
+      updated_by: (await supabase.auth.getUser()).data.user?.id
+    });
+  }
 
   // Warehouse Management
   async getWarehouses() {
-    const { data, error } = await supabase
-      .from('warehouses')
+    const warehousesAPI = createSchemaBuilder('warehouses');
+    const { data, error } = await warehousesAPI
       .select('*')
       .order('name');
     return { data, error };
-  },
+  }
 
   async createWarehouse(warehouse: Omit<Warehouse, 'id'>) {
-    const { data, error } = await supabase
-      .from('warehouses')
+    const warehousesAPI = createSchemaBuilder('warehouses');
+    const { data, error } = await warehousesAPI
       .insert([warehouse])
       .select()
       .single();
     return { data, error };
-  },
+  }
 
   // Stock Location Management
   async getLocations(warehouseId: string) {
-    const { data, error } = await supabase
-      .from('stock_locations')
+    const locationsAPI = createSchemaBuilder('stock_locations');
+    const { data, error } = await locationsAPI
       .select('*')
       .eq('warehouse_id', warehouseId)
       .order('zone, rack, shelf, bin');
     return { data, error };
-  },
+  }
 
   // Inventory Transactions
   async createTransaction(transaction: Omit<InventoryTransaction, 'id' | 'createdAt' | 'updatedAt'>) {
-    const { data: trx, error: trxError } = await supabase
-      .from('inventory_transactions')
+    const transactionsAPI = createSchemaBuilder('inventory_transactions');
+    const { data: trx, error: trxError } = await transactionsAPI
       .insert([{
         ...transaction,
-        created_by: supabase.auth.getUser()?.id
+        created_by: (await supabase.auth.getUser()).data.user?.id
       }])
       .select()
       .single();
@@ -94,8 +85,8 @@ export const inventoryAPI = {
       return { error: trxError };
     }
 
-    const { error: itemsError } = await supabase
-      .from('inventory_transaction_items')
+    const transactionItemsAPI = createSchemaBuilder('inventory_transaction_items');
+    const { error: itemsError } = await transactionItemsAPI
       .insert(
         transaction.items.map(item => ({
           ...item,
@@ -104,11 +95,11 @@ export const inventoryAPI = {
       );
 
     return { data: trx, error: itemsError };
-  },
+  }
 
   async getTransactionById(id: string) {
-    const { data: transaction, error: trxError } = await supabase
-      .from('inventory_transactions')
+    const transactionsAPI = createSchemaBuilder('inventory_transactions');
+    const { data: transaction, error: trxError } = await transactionsAPI
       .select(`
         *,
         items:inventory_transaction_items(*)
@@ -118,4 +109,6 @@ export const inventoryAPI = {
 
     return { data: transaction, error: trxError };
   }
-};
+}
+
+export const inventoryAPI = new InventoryAPI();

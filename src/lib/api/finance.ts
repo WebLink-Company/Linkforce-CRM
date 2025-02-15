@@ -1,4 +1,5 @@
-import { supabase } from '../supabase';
+import { BaseAPI } from './base';
+import { supabase, createSchemaBuilder } from '../supabase';
 import type { 
   Account,
   AccountMovement,
@@ -7,31 +8,29 @@ import type {
   PaymentTerm,
   PriceList,
   Discount
-} from '../types/billing';
+} from '../../types/billing';
 
-export const financeAPI = {
+class FinanceAPI extends BaseAPI {
+  constructor() {
+    super('accounts');
+  }
+
   // Account Management
   async getAccounts() {
-    const { data, error } = await supabase
-      .from('accounts')
+    const { data, error } = await this.query
       .select('*')
       .order('code');
     return { data, error };
-  },
+  }
 
   async createAccount(account: Omit<Account, 'id' | 'created_at' | 'updated_at'>) {
-    const { data, error } = await supabase
-      .from('accounts')
-      .insert([account])
-      .select()
-      .single();
-    return { data, error };
-  },
+    return this.create(account);
+  }
 
   // Account Movements
   async createMovement(movement: Omit<AccountMovement, 'id' | 'created_at'>) {
-    const { data, error } = await supabase
-      .from('account_movements')
+    const movementsAPI = createSchemaBuilder('account_movements');
+    const { data, error } = await movementsAPI
       .insert([{
         ...movement,
         created_by: (await supabase.auth.getUser()).data.user?.id
@@ -39,14 +38,15 @@ export const financeAPI = {
       .select()
       .single();
     return { data, error };
-  },
+  }
 
   async getAccountMovements(accountId: string, startDate?: string, endDate?: string) {
     try {
       console.log('Getting movements for account:', accountId, 'from:', startDate, 'to:', endDate);
+      const accountsAPI = createSchemaBuilder('accounts');
+      
       // First get the account ID from the code
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
+      const { data: account, error: accountError } = await accountsAPI
         .select('id')
         .eq('code', accountId)
         .single();
@@ -60,8 +60,8 @@ export const financeAPI = {
         throw new Error('Account not found');
       }
 
-      let query = supabase
-        .from('account_movements')
+      const movementsAPI = createSchemaBuilder('account_movements');
+      let query = movementsAPI
         .select(`
           *,
           account:accounts(*)
@@ -84,32 +84,32 @@ export const financeAPI = {
       console.error('Error in getAccountMovements:', error);
       return { data: null, error };
     }
-  },
+  }
 
   // Payment Methods
   async getPaymentMethods() {
-    const { data, error } = await supabase
-      .from('payment_methods')
+    const paymentMethodsAPI = createSchemaBuilder('payment_methods');
+    const { data, error } = await paymentMethodsAPI
       .select('*')
       .eq('is_active', true)
       .order('name');
     return { data, error };
-  },
+  }
 
   // Payment Terms
   async getPaymentTerms() {
-    const { data, error } = await supabase
-      .from('payment_terms')
+    const paymentTermsAPI = createSchemaBuilder('payment_terms');
+    const { data, error } = await paymentTermsAPI
       .select('*')
       .eq('is_active', true)
       .order('days');
     return { data, error };
-  },
+  }
 
   // Payments
   async createPayment(payment: Omit<Payment, 'id' | 'created_at'>) {
-    const { data: paymentData, error: paymentError } = await supabase
-      .from('payments')
+    const paymentsAPI = createSchemaBuilder('payments');
+    const { data: paymentData, error: paymentError } = await paymentsAPI
       .insert([{
         ...payment,
         created_by: (await supabase.auth.getUser()).data.user?.id
@@ -120,22 +120,20 @@ export const financeAPI = {
     if (paymentError) return { error: paymentError };
 
     // Update invoice payment status
-    const { data: invoicePayments } = await supabase
-      .from('payments')
+    const { data: invoicePayments } = await paymentsAPI
       .select('amount')
       .eq('invoice_id', payment.invoice_id);
 
     const totalPaid = (invoicePayments || []).reduce((sum, p) => sum + p.amount, 0);
 
-    const { data: invoice } = await supabase
-      .from('invoices')
+    const invoicesAPI = createSchemaBuilder('invoices');
+    const { data: invoice } = await invoicesAPI
       .select('total_amount')
       .eq('id', payment.invoice_id)
       .single();
 
     if (invoice) {
-      const { error: updateError } = await supabase
-        .from('invoices')
+      const { error: updateError } = await invoicesAPI
         .update({
           payment_status: totalPaid >= invoice.total_amount ? 'paid' : 'partial'
         })
@@ -145,61 +143,16 @@ export const financeAPI = {
     }
 
     return { data: paymentData, error: null };
-  },
-
-  // Price Lists
-  async getPriceLists() {
-    const { data, error } = await supabase
-      .from('price_lists')
-      .select(`
-        *,
-        items:price_list_items(
-          *,
-          product:inventory_items(*)
-        )
-      `)
-      .eq('is_active', true);
-    return { data, error };
-  },
-
-  async createPriceList(priceList: Omit<PriceList, 'id' | 'created_at' | 'updated_at'>) {
-    const { data, error } = await supabase
-      .from('price_lists')
-      .insert([priceList])
-      .select()
-      .single();
-    return { data, error };
-  },
-
-  // Discounts
-  async getDiscounts() {
-    const { data, error } = await supabase
-      .from('discounts')
-      .select(`
-        *,
-        customer_category:customer_categories(*),
-        product:inventory_items(*)
-      `)
-      .eq('is_active', true);
-    return { data, error };
-  },
-
-  async createDiscount(discount: Omit<Discount, 'id' | 'created_at' | 'updated_at'>) {
-    const { data, error } = await supabase
-      .from('discounts')
-      .insert([discount])
-      .select()
-      .single();
-    return { data, error };
-  },
+  }
 
   // Financial Reports
   async getAccountBalance(accountId: string, asOfDate: string) {
     try {
       console.log('Getting balance for account:', accountId, 'as of:', asOfDate);
+      const accountsAPI = createSchemaBuilder('accounts');
+      
       // First get the account ID from the code
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
+      const { data: account, error: accountError } = await accountsAPI
         .select('id, type')
         .eq('code', accountId)
         .single();
@@ -226,7 +179,7 @@ export const financeAPI = {
       console.error('Error in getAccountBalance:', error);
       return { data: null, error };
     }
-  },
+  }
 
   async getAgedReceivables(asOfDate: string) {
     const { data, error } = await supabase
@@ -234,7 +187,7 @@ export const financeAPI = {
         p_as_of_date: asOfDate
       });
     return { data, error };
-  },
+  }
 
   async getCashFlow(startDate: string, endDate: string) {
     const { data, error } = await supabase
@@ -244,4 +197,6 @@ export const financeAPI = {
       });
     return { data, error };
   }
-};
+}
+
+export const financeAPI = new FinanceAPI();
