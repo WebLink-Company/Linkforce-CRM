@@ -28,7 +28,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'x-application-name': 'quimicinter-erp'
+      'x-application-name': 'quimicinter-erp',
+      'x-schema-name': getCurrentSchema()
     }
   },
   db: {
@@ -81,89 +82,4 @@ export const updateProfile = async (userId: string, updates: any) => {
     .update(updates)
     .eq('id', userId);
   return { data, error };
-};
-
-export const getInventoryItems = async (
-  search?: string,
-  categoryId?: string,
-  page = 1,
-  limit = 10
-) => {
-  let query = createSchemaBuilder('inventory_items')
-    .select('*, inventory_categories(name)', { count: 'exact' });
-
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
-  }
-
-  if (categoryId) {
-    query = query.eq('category_id', categoryId);
-  }
-
-  const { data, error, count } = await query
-    .range((page - 1) * limit, page * limit - 1)
-    .order('created_at', { ascending: false });
-
-  return { data, error, count };
-};
-
-export const createInventoryItem = async (item: any) => {
-  const { data, error } = await createSchemaBuilder('inventory_items')
-    .insert([{ ...item, created_by: supabase.auth.getUser()?.id }])
-    .select()
-    .single();
-  return { data, error };
-};
-
-export const updateInventoryItem = async (id: string, updates: any) => {
-  const { data, error } = await createSchemaBuilder('inventory_items')
-    .update({ ...updates, updated_by: supabase.auth.getUser()?.id })
-    .eq('id', id)
-    .select()
-    .single();
-  return { data, error };
-};
-
-export const createInventoryMovement = async (movement: any) => {
-  const { data: item } = await createSchemaBuilder('inventory_items')
-    .select('current_stock')
-    .eq('id', movement.item_id)
-    .single();
-
-  if (!item) {
-    return { error: new Error('Item not found') };
-  }
-
-  const previousStock = item.current_stock;
-  const newStock = previousStock + (
-    movement.movement_type === 'in' ? movement.quantity :
-    movement.movement_type === 'out' ? -movement.quantity :
-    movement.quantity
-  );
-
-  const { data, error } = await supabase.rpc('create_inventory_movement', {
-    p_item_id: movement.item_id,
-    p_movement_type: movement.movement_type,
-    p_quantity: movement.quantity,
-    p_previous_stock: previousStock,
-    p_new_stock: newStock,
-    p_notes: movement.notes,
-  });
-
-  return { data, error };
-};
-
-// Add retry logic for failed requests
-export const withRetry = async <T>(
-  fn: () => Promise<T>,
-  retries = 3,
-  delay = 1000
-): Promise<T> => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries === 0) throw error;
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return withRetry(fn, retries - 1, delay * 2);
-  }
 };

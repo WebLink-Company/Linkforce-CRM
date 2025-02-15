@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { LoginForm as ILoginForm, ERRORES_VALIDACION } from '../../types/auth';
-import { supabase } from '../../lib/supabase';
+import { login } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
 
 const MAX_LOGIN_ATTEMPTS = 3;
@@ -57,39 +57,38 @@ export default function LoginForm() {
     
     setCargando(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      const result = await login(formData.email, formData.password);
 
-      if (error) throw error;
-
-      if (data.user) {
-        setLoginAttempts(0);
-        setLockoutUntil(null);
-        
-        await supabase
-          .from('profiles')
-          .update({ last_login: new Date().toISOString() })
-          .eq('id', data.user.id);
-
-        if (formData.recordar) {
-          localStorage.setItem('supabase.auth.token', data.session?.access_token || '');
+      if (!result.success) {
+        if (result.error?.code === 'schema_mismatch') {
+          setErrores([result.error.message]);
+          return;
         }
 
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      const newAttempts = loginAttempts + 1;
-      setLoginAttempts(newAttempts);
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
 
-      if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-        const lockoutTime = Date.now() + LOCKOUT_DURATION;
-        setLockoutUntil(lockoutTime);
-        setErrores([ERRORES_VALIDACION.CUENTA_BLOQUEADA]);
-      } else {
-        setErrores([ERRORES_VALIDACION.CREDENCIALES_INVALIDAS]);
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          const lockoutTime = Date.now() + LOCKOUT_DURATION;
+          setLockoutUntil(lockoutTime);
+          setErrores([ERRORES_VALIDACION.CUENTA_BLOQUEADA]);
+        } else {
+          setErrores([ERRORES_VALIDACION.CREDENCIALES_INVALIDAS]);
+        }
+        return;
       }
+
+      setLoginAttempts(0);
+      setLockoutUntil(null);
+      
+      if (formData.recordar && result.data?.session) {
+        localStorage.setItem('supabase.auth.token', result.data.session.access_token);
+      }
+
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrores(['Error al iniciar sesión']);
     } finally {
       setCargando(false);
     }
