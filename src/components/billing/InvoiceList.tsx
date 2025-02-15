@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Search, Plus, Filter, RefreshCw, Download } from 'lucide-react';
+import { FileText, Search, Plus, Filter, RefreshCw, Download, Printer, Eye, XCircle } from 'lucide-react';
 import { billingAPI } from '../../lib/api/billing';
 import type { Invoice } from '../../types/billing';
 import CreateInvoiceModal from './CreateInvoiceModal';
 import InvoiceFilters from './InvoiceFilters';
+import InvoiceViewerModal from './InvoiceViewerModal';
 import { exportToCSV } from '../../utils/export';
 
 export default function InvoiceList() {
@@ -11,6 +12,8 @@ export default function InvoiceList() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showViewerModal, setShowViewerModal] = useState(false);
 
   const loadInvoices = async () => {
     try {
@@ -36,6 +39,34 @@ export default function InvoiceList() {
       }
     } catch (error) {
       console.error('Error exporting invoices:', error);
+    }
+  };
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowViewerModal(true);
+  };
+
+  const handlePrintInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowViewerModal(true);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handleVoidInvoice = async (invoice: Invoice) => {
+    if (window.confirm('¿Está seguro que desea anular esta factura?')) {
+      try {
+        const reason = prompt('Por favor, indique el motivo de la anulación:');
+        if (reason) {
+          const { error } = await billingAPI.voidInvoice(invoice.id, reason);
+          if (error) throw error;
+          loadInvoices();
+        }
+      } catch (error) {
+        console.error('Error voiding invoice:', error);
+      }
     }
   };
 
@@ -139,7 +170,7 @@ export default function InvoiceList() {
                     {invoice.ncf}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {invoice.customer_id}
+                    {invoice.customer?.full_name || invoice.customer_id}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     {new Date(invoice.issue_date).toLocaleDateString()}
@@ -161,15 +192,24 @@ export default function InvoiceList() {
                     </span>
                   </td>
                   <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                    <button className="text-blue-600 hover:text-blue-900 mr-4">
-                      Ver
+                    <button 
+                      onClick={() => handleViewInvoice(invoice)}
+                      className="text-blue-600 hover:text-blue-900 mr-4"
+                    >
+                      <Eye className="h-4 w-4" />
                     </button>
-                    <button className="text-blue-600 hover:text-blue-900 mr-4">
-                      Imprimir
+                    <button 
+                      onClick={() => handlePrintInvoice(invoice)}
+                      className="text-blue-600 hover:text-blue-900 mr-4"
+                    >
+                      <Printer className="h-4 w-4" />
                     </button>
                     {invoice.status === 'draft' && (
-                      <button className="text-red-600 hover:text-red-900">
-                        Anular
+                      <button 
+                        onClick={() => handleVoidInvoice(invoice)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <XCircle className="h-4 w-4" />
                       </button>
                     )}
                   </td>
@@ -184,6 +224,15 @@ export default function InvoiceList() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={loadInvoices}
+      />
+
+      <InvoiceViewerModal
+        isOpen={showViewerModal}
+        onClose={() => {
+          setShowViewerModal(false);
+          setSelectedInvoice(null);
+        }}
+        invoice={selectedInvoice}
       />
     </div>
   );

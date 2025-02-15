@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Filter, RefreshCw, FolderPlus } from 'lucide-react';
-import { inventoryAPI } from '../../lib/api/inventory';
+import { Package, Search, Plus, Filter, RefreshCw, Download, FlaskRound as Flask } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import type { InventoryItem } from '../../types/erp';
 import AddProductModal from './AddProductModal';
 import AddCategoryModal from './AddCategoryModal';
+import { exportToCSV } from '../../utils/export';
+import { Link } from 'react-router-dom';
 
 export default function InventoryList() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -11,10 +13,15 @@ export default function InventoryList() {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const loadInventoryItems = async () => {
     try {
-      const { data, error } = await inventoryAPI.getInventoryItems();
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .order('name');
+
       if (error) throw error;
       setItems(data || []);
     } catch (error) {
@@ -27,6 +34,36 @@ export default function InventoryList() {
   useEffect(() => {
     loadInventoryItems();
   }, []);
+
+  const handleEdit = (item: InventoryItem) => {
+    setEditingItem(item);
+    setShowAddModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Está seguro que desea eliminar este producto?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadInventoryItems();
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Error al eliminar el producto');
+    }
+  };
+
+  const handleModalClose = () => {
+    setShowAddModal(false);
+    setEditingItem(null);
+  };
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -51,11 +88,18 @@ export default function InventoryList() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
+          <Link
+            to="/materias-primas"
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
+          >
+            <Flask className="h-4 w-4 mr-2" />
+            Materias Primas
+          </Link>
           <button
             onClick={() => setShowAddCategoryModal(true)}
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 sm:w-auto"
           >
-            <FolderPlus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-2" />
             Nueva Categoría
           </button>
           <button
@@ -115,6 +159,9 @@ export default function InventoryList() {
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                   Unidad
                 </th>
+                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                  Precio
+                </th>
                 <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                   <span className="sr-only">Acciones</span>
                 </th>
@@ -135,11 +182,23 @@ export default function InventoryList() {
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     {item.unit_measure}
                   </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    {new Intl.NumberFormat('es-DO', {
+                      style: 'currency',
+                      currency: 'DOP'
+                    }).format(item.unit_price || 0)}
+                  </td>
                   <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                    <button className="text-blue-600 hover:text-blue-900 mr-4">
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="text-blue-600 hover:text-blue-900 mr-4"
+                    >
                       Editar
                     </button>
-                    <button className="text-red-600 hover:text-red-900">
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
                       Eliminar
                     </button>
                   </td>
@@ -152,8 +211,9 @@ export default function InventoryList() {
 
       <AddProductModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={handleModalClose}
         onSuccess={loadInventoryItems}
+        editingItem={editingItem}
       />
 
       <AddCategoryModal

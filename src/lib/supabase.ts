@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../types/supabase';
+import type { Database } from '../types/supabase';
 
-// Use Vite's import.meta.env instead of process.env
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -9,8 +8,40 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Determine schema dynamically based on hostname
+const getCurrentSchema = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
 
+    if (hostname.includes('qa')) return 'qalinkforce';
+    if (hostname.includes('quimicinter')) return 'quimicinter';
+  }
+  return 'public'; // Default to production
+};
+
+// Initialize Supabase client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'x-application-name': 'quimicinter-erp'
+    }
+  },
+  db: {
+    schema: getCurrentSchema() // Use dynamic schema
+  }
+});
+
+// Helper function to create a query builder with the correct schema
+export const createSchemaBuilder = (table: string) => {
+  return supabase.from(table).schema(getCurrentSchema());
+};
+
+// Auth functions that use the correct schema
 export const signUp = async (email: string, password: string, fullName: string) => {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -38,8 +69,7 @@ export const signOut = async () => {
 };
 
 export const getProfile = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data, error } = await createSchemaBuilder('profiles')
     .select('*')
     .eq('id', userId)
     .single();
@@ -47,8 +77,7 @@ export const getProfile = async (userId: string) => {
 };
 
 export const updateProfile = async (userId: string, updates: any) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const { data, error } = await createSchemaBuilder('profiles')
     .update(updates)
     .eq('id', userId);
   return { data, error };
@@ -60,8 +89,7 @@ export const getInventoryItems = async (
   page = 1,
   limit = 10
 ) => {
-  let query = supabase
-    .from('inventory_items')
+  let query = createSchemaBuilder('inventory_items')
     .select('*, inventory_categories(name)', { count: 'exact' });
 
   if (search) {
@@ -80,8 +108,7 @@ export const getInventoryItems = async (
 };
 
 export const createInventoryItem = async (item: any) => {
-  const { data, error } = await supabase
-    .from('inventory_items')
+  const { data, error } = await createSchemaBuilder('inventory_items')
     .insert([{ ...item, created_by: supabase.auth.getUser()?.id }])
     .select()
     .single();
@@ -89,8 +116,7 @@ export const createInventoryItem = async (item: any) => {
 };
 
 export const updateInventoryItem = async (id: string, updates: any) => {
-  const { data, error } = await supabase
-    .from('inventory_items')
+  const { data, error } = await createSchemaBuilder('inventory_items')
     .update({ ...updates, updated_by: supabase.auth.getUser()?.id })
     .eq('id', id)
     .select()
@@ -99,8 +125,7 @@ export const updateInventoryItem = async (id: string, updates: any) => {
 };
 
 export const createInventoryMovement = async (movement: any) => {
-  const { data: item } = await supabase
-    .from('inventory_items')
+  const { data: item } = await createSchemaBuilder('inventory_items')
     .select('current_stock')
     .eq('id', movement.item_id)
     .single();
@@ -126,4 +151,19 @@ export const createInventoryMovement = async (movement: any) => {
   });
 
   return { data, error };
+};
+
+// Add retry logic for failed requests
+export const withRetry = async <T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries === 0) throw error;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 2);
+  }
 };

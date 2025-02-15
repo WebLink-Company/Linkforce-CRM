@@ -1,0 +1,177 @@
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, Eye } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import type { PurchaseOrder } from '../../types/payables';
+import PurchaseViewerModal from '../purchases/PurchaseViewerModal';
+
+interface PendingPayable {
+  order_id: string;
+  supplier_id: string;
+  supplier_name: string;
+  order_number: string;
+  issue_date: string;
+  expected_date: string;
+  total_amount: number;
+  paid_amount: number;
+  pending_amount: number;
+  days_overdue: number;
+  supplier: any;
+  items: any[];
+}
+
+export default function PendingPayables() {
+  const [payables, setPayables] = useState<PendingPayable[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [showViewerModal, setShowViewerModal] = useState(false);
+
+  useEffect(() => {
+    loadPayables();
+  }, []);
+
+  const loadPayables = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_pending_payables');
+      if (error) throw error;
+      setPayables(data || []);
+    } catch (error) {
+      console.error('Error loading payables:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewOrder = (payable: PendingPayable) => {
+    const order: PurchaseOrder = {
+      id: payable.order_id,
+      number: payable.order_number,
+      supplier_id: payable.supplier_id,
+      issue_date: payable.issue_date,
+      expected_date: payable.expected_date,
+      status: 'sent',
+      subtotal: payable.total_amount - (payable.total_amount * 0.18),
+      tax_amount: payable.total_amount * 0.18,
+      discount_amount: 0,
+      total_amount: payable.total_amount,
+      supplier: payable.supplier,
+      items: payable.items,
+      created_at: '',
+      updated_at: ''
+    };
+    setSelectedOrder(order);
+    setShowViewerModal(true);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP'
+    }).format(amount);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!payables.length) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No hay órdenes de compra pendientes de pago
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Proveedor
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Orden
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fecha Esperada
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pagado
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pendiente
+              </th>
+              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th scope="col" className="relative px-6 py-3">
+                <span className="sr-only">Acciones</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {payables.map((payable) => (
+              <tr key={payable.order_id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {payable.supplier_name}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {payable.order_number}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {new Date(payable.expected_date).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                  {formatCurrency(payable.total_amount)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">
+                  {formatCurrency(payable.paid_amount)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-medium">
+                  {formatCurrency(payable.pending_amount)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
+                  {payable.days_overdue > 0 ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      {payable.days_overdue} días vencida
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Al día
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => handleViewOrder(payable)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    <Eye className="h-5 w-5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <PurchaseViewerModal
+        isOpen={showViewerModal}
+        onClose={() => {
+          setShowViewerModal(false);
+          setSelectedOrder(null);
+        }}
+        purchase={selectedOrder}
+      />
+    </>
+  );
+}
