@@ -12,6 +12,14 @@ export function useAuth() {
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.access_token) {
+          localStorage.setItem('supabase.auth.token', session.access_token);
+        }
+        if (session?.refresh_token) {
+          localStorage.setItem('supabase.auth.refreshToken', session.refresh_token);
+        }
+        
         setUser(session?.user ?? null);
       } catch (error) {
         console.error('Error getting auth session:', error);
@@ -27,6 +35,13 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.access_token) {
+        localStorage.setItem('supabase.auth.token', session.access_token);
+      }
+      if (session?.refresh_token) {
+        localStorage.setItem('supabase.auth.refreshToken', session.refresh_token);
+      }
+      
       setUser(session?.user ?? null);
       setLoading(false);
     });

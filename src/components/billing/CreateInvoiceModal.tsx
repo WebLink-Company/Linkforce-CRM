@@ -6,6 +6,7 @@ import CreateCustomerModal from '../customers/CreateCustomerModal';
 import CreateCorporateCustomerModal from '../customers/CreateCorporateCustomerModal';
 import CustomerTypeDialog from '../customers/CustomerTypeDialog';
 import AddProductModal from '../inventory/AddProductModal';
+import type { Customer } from '../../types/customer';
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
@@ -96,42 +97,42 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   }, [formData.customer_id]);
 
   const loadCustomers = async () => {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, full_name')
-      .eq('status', 'active')
-      .order('full_name');
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, full_name')
+        .eq('status', 'active')
+        .order('full_name');
 
-    if (error) {
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (error) {
       console.error('Error loading customers:', error);
-      return;
     }
-
-    setCustomers(data || []);
   };
 
   const loadCustomerDetails = async () => {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('identification_number, commercial_name, invoice_type, payment_terms')
-      .eq('id', formData.customer_id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('identification_number, commercial_name, invoice_type, payment_terms')
+        .eq('id', formData.customer_id)
+        .single();
 
-    if (error) {
+      if (error) throw error;
+      setCustomerDetails(data);
+
+      if (data.payment_terms && data.payment_terms !== 'contado') {
+        const days = parseInt(data.payment_terms);
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + days);
+        setFormData(prev => ({
+          ...prev,
+          due_date: dueDate.toISOString().split('T')[0]
+        }));
+      }
+    } catch (error) {
       console.error('Error loading customer details:', error);
-      return;
-    }
-
-    setCustomerDetails(data);
-
-    if (data.payment_terms && data.payment_terms !== 'contado') {
-      const days = parseInt(data.payment_terms);
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + days);
-      setFormData(prev => ({
-        ...prev,
-        due_date: dueDate.toISOString().split('T')[0]
-      }));
     }
   };
 
@@ -143,8 +144,6 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
         .order('name');
 
       if (error) throw error;
-
-      console.log('Loaded products:', data);
       setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -152,10 +151,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   };
 
   const handleProductChange = (index: number, productId: string) => {
-    console.log('Selected product ID:', productId);
     const product = products.find(p => p.id === productId);
-    console.log('Found product:', product);
-
     if (product) {
       const newItems = [...items];
       const item = newItems[index];
@@ -207,23 +203,15 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
     setItems(newItems);
   };
 
-  const calculateTotals = () => {
-    return items.reduce((acc, item) => {
-      const totals = calculateItemTotal(item);
-      return {
-        subtotal: acc.subtotal + totals.subtotal,
-        tax: acc.tax + totals.tax,
-        discount: acc.discount + totals.discount,
-        total: acc.total + totals.total,
-      };
-    }, { subtotal: 0, tax: 0, discount: 0, total: 0 });
-  };
-
   const validateForm = (): boolean => {
     const errors: string[] = [];
 
     if (!formData.customer_id) {
       errors.push('Debe seleccionar un cliente');
+    }
+
+    if (!formData.due_date) {
+      errors.push('Debe seleccionar una fecha de vencimiento');
     }
 
     const invalidProducts = items.some(item => !item.product_id);
@@ -252,14 +240,16 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
     setLoading(true);
 
     try {
-      const totals = calculateTotals();
-      
+      const totals = items.reduce((acc, item) => ({
+        subtotal: acc.subtotal + (item.quantity * item.unit_price),
+        tax_amount: acc.tax_amount + item.tax_amount,
+        discount_amount: acc.discount_amount + item.discount_amount,
+        total_amount: acc.total_amount + item.total_amount
+      }), { subtotal: 0, tax_amount: 0, discount_amount: 0, total_amount: 0 });
+
       const { error } = await billingAPI.createInvoice({
         ...formData,
-        subtotal: totals.subtotal,
-        tax_amount: totals.tax,
-        discount_amount: totals.discount,
-        total_amount: totals.total,
+        ...totals,
         status: 'draft',
         payment_status: 'pending',
       }, items);
@@ -269,6 +259,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
       onSuccess();
       onClose();
     } catch (error) {
+      console.error('Error creating invoice:', error);
       setError(error instanceof Error ? error.message : 'Error creating invoice');
     } finally {
       setLoading(false);
@@ -286,7 +277,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
 
   if (!isOpen) return null;
 
-  const totals = calculateTotals();
+  const totals = items.reduce((acc, item) => ({
+    subtotal: acc.subtotal + (item.quantity * item.unit_price),
+    tax_amount: acc.tax_amount + item.tax_amount,
+    discount_amount: acc.discount_amount + item.discount_amount,
+    total_amount: acc.total_amount + item.total_amount
+  }), { subtotal: 0, tax_amount: 0, discount_amount: 0, total_amount: 0 });
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 overflow-hidden">
@@ -564,16 +560,16 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                   {new Intl.NumberFormat('es-DO', {
                     style: 'currency',
                     currency: 'DOP'
-                  }).format(totals.tax)}
+                  }).format(totals.tax_amount)}
                 </dd>
               </div>
-              {totals.discount > 0 && (
+              {totals.discount_amount > 0 && (
                 <div className="flex justify-between text-sm text-red-600">
                   <dt>Descuento:</dt>
                   <dd>-{new Intl.NumberFormat('es-DO', {
                     style: 'currency',
                     currency: 'DOP'
-                  }).format(totals.discount)}</dd>
+                  }).format(totals.discount_amount)}</dd>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold border-t pt-2">
@@ -581,7 +577,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                 <dd>{new Intl.NumberFormat('es-DO', {
                   style: 'currency',
                   currency: 'DOP'
-                }).format(totals.total)}</dd>
+                }).format(totals.total_amount)}</dd>
               </div>
             </dl>
 

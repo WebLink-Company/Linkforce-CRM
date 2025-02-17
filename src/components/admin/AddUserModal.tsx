@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getSchemaFromHostname } from '../../lib/auth';
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -15,48 +16,80 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     fullName: '',
     role: 'user',
   });
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const validateForm = () => {
+    if (!formData.email || !formData.password || !formData.fullName) {
+      setError('Todos los campos son requeridos');
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('El formato del correo electrónico no es válido');
+      return false;
+    }
+
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+    
     setLoading(true);
     setError(null);
 
     try {
-      // Create the user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Get current schema
+      const schema = getSchemaFromHostname();
+
+      // Create auth user
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             full_name: formData.fullName,
-          },
-        },
+            role: formData.role,
+            schema_name: schema
+          }
+        }
       });
 
-      if (authError) throw authError;
+      if (signUpError) throw signUpError;
+      if (!data.user) throw new Error('No user data returned');
 
-      if (!authData.user) {
-        throw new Error('Failed to create user');
-      }
-
-      // Create the profile record
+      // Create profile in current schema
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([{
-          id: authData.user.id,
+          id: data.user.id,
+          email: formData.email,
           full_name: formData.fullName,
           role: formData.role,
           status: 'active',
+          schema_name: schema
         }]);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        // If profile creation fails, attempt to clean up auth user
+        await supabase.auth.admin.deleteUser(data.user.id);
+        throw profileError;
+      }
 
       onSuccess();
       onClose();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Error creating user');
+      console.error('Error creating user:', error);
+      setError(error instanceof Error ? error.message : 'Error al crear el usuario');
     } finally {
       setLoading(false);
     }
@@ -91,7 +124,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
                 id="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value.trim() })}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
             </div>
@@ -104,10 +137,14 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
                 type="password"
                 id="password"
                 required
+                minLength={8}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
+              <p className="mt-1 text-sm text-gray-500">
+                Mínimo 8 caracteres
+              </p>
             </div>
 
             <div>
@@ -155,7 +192,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
               disabled={loading}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              {loading ? 'Creando...' : 'Crear Usuario'}
+              {loading ? 'Guardando...' : 'Crear Usuario'}
             </button>
           </div>
         </form>

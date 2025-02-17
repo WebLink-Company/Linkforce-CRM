@@ -24,7 +24,7 @@ export const getSchemaFromHostname = (): string => {
     if (hostname.includes('qa')) return 'qalinkforce';
     if (hostname.includes('quimicinter')) return 'quimicinter';
   }
-  return 'public'; // Default to production
+  return 'public';
 };
 
 // Validate user has access to current schema
@@ -37,7 +37,7 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
       .from('profiles')
       .select('role, schema_name')
       .eq('id', user.id)
-      .maybeSingle(); // Use maybeSingle instead of single to handle missing profile
+      .maybeSingle();
 
     if (error) {
       throw error;
@@ -49,9 +49,10 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
         .from('profiles')
         .insert([{
           id: user.id,
+          email: user.email,
           full_name: user.user_metadata?.full_name || '',
           schema_name: currentSchema,
-          role: 'user',
+          role: user.user_metadata?.role || 'user',
           status: 'active'
         }]);
 
@@ -72,7 +73,7 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
         success: false,
         error: {
           code: 'schema_mismatch',
-          message: 'You do not have access to this environment'
+          message: 'No tienes acceso a este ambiente. Por favor, contacta al administrador.'
         }
       };
     }
@@ -84,7 +85,7 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
       success: false,
       error: {
         code: 'validation_error',
-        message: 'Error validating access'
+        message: 'Error validando acceso'
       }
     };
   }
@@ -94,7 +95,11 @@ export const login = async (email: string, password: string): Promise<AuthResult
   try {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
-      password
+      password,
+      options: {
+        // Set session persistence to local storage
+        persistSession: true
+      }
     });
 
     if (authError) throw authError;
@@ -112,6 +117,12 @@ export const login = async (email: string, password: string): Promise<AuthResult
       .update({ last_login: new Date().toISOString() })
       .eq('id', authData.user.id);
 
+    // Store session in local storage
+    if (authData.session) {
+      localStorage.setItem('supabase.auth.token', authData.session.access_token);
+      localStorage.setItem('supabase.auth.refreshToken', authData.session.refresh_token);
+    }
+
     return { success: true, data: authData };
   } catch (error) {
     console.error('Login error:', error);
@@ -119,7 +130,7 @@ export const login = async (email: string, password: string): Promise<AuthResult
       success: false,
       error: {
         code: 'auth_error',
-        message: error instanceof Error ? error.message : 'Error during login'
+        message: error instanceof Error ? error.message : 'Error durante el inicio de sesión'
       }
     };
   }
@@ -131,15 +142,19 @@ export const logout = async (): Promise<LogoutResult> => {
     
     if (error) throw error;
     
+    // Clear stored tokens
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('supabase.auth.refreshToken');
+    
     return {
       success: true,
-      message: 'Successfully logged out'
+      message: 'Sesión cerrada exitosamente'
     };
   } catch (error) {
     console.error('Logout error:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Error during logout'
+      message: error instanceof Error ? error.message : 'Error al cerrar sesión'
     };
   }
 };
