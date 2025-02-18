@@ -31,6 +31,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
 
   const loadPaymentMethods = async () => {
     const { data, error } = await financeAPI.getPaymentMethods();
+    console.log("Payment Methods Response:", { data, error }); // Debugging line
     if (error) {
       console.error('Error loading payment methods:', error);
       return;
