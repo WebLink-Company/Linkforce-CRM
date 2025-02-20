@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Receipt, Calendar } from 'lucide-react';
-import { financeAPI } from '../../lib/api/finance';
-import type { Invoice, PaymentMethod } from '../../types/billing';
+import { supabase } from '../../lib/supabase';
+import type { Invoice } from '../../types/billing';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     notes: '',
   });
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,12 +30,19 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   }, [isOpen]);
 
   const loadPaymentMethods = async () => {
-    const { data, error } = await financeAPI.getPaymentMethods();
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setPaymentMethods(data || []);
+    } catch (error) {
       console.error('Error loading payment methods:', error);
-      return;
+      setError('Error loading payment methods');
     }
-    setPaymentMethods(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,10 +51,13 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     setError(null);
 
     try {
-      const { error } = await financeAPI.createPayment({
-        ...formData,
-        invoice_id: invoice.id,
-      });
+      const { error } = await supabase
+        .from('payments')
+        .insert([{
+          ...formData,
+          invoice_id: invoice.id,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        }]);
 
       if (error) throw error;
 
@@ -66,38 +76,63 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   const remainingAmount = invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-md">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">Registrar Pago</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
+        {/* Glowing border effects */}
+        <div className="absolute inset-0 rounded-lg pointer-events-none">
+          {/* Top border */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-x-0 top-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
+          
+          {/* Bottom border */}
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-x-0 bottom-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
+          
+          {/* Left border */}
+          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 left-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
+          
+          {/* Right border */}
+          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 right-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
+          
+          {/* Corner glows */}
+          <div className="absolute top-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
+          <div className="absolute bottom-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
+        </div>
+
+        <div className="flex justify-between items-center p-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold text-white">Registrar Pago</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4">
           {error && (
-            <div className="mb-4 bg-red-50 p-4 rounded-md">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mb-4 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
+              <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
           <div className="space-y-4">
             {/* Invoice Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Resumen de Factura</h3>
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10 mb-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Resumen de Factura</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">NCF</p>
-                  <p className="font-medium">{invoice.ncf}</p>
+                  <p className="text-gray-400">NCF</p>
+                  <p className="font-medium text-white">{invoice.ncf}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Cliente</p>
-                  <p className="font-medium">{invoice.customer?.full_name}</p>
+                  <p className="text-gray-400">Cliente</p>
+                  <p className="font-medium text-white">{invoice.customer?.full_name}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Total Factura</p>
-                  <p className="font-medium">
+                  <p className="text-gray-400">Total Factura</p>
+                  <p className="font-medium text-white">
                     {new Intl.NumberFormat('es-DO', {
                       style: 'currency',
                       currency: 'DOP'
@@ -105,8 +140,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Pendiente</p>
-                  <p className="font-medium text-blue-600">
+                  <p className="text-gray-400">Pendiente</p>
+                  <p className="font-medium text-blue-400">
                     {new Intl.NumberFormat('es-DO', {
                       style: 'currency',
                       currency: 'DOP'
@@ -117,7 +152,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
             </div>
 
             <div>
-              <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="payment_method" className="block text-sm font-medium text-gray-300">
                 Método de Pago
               </label>
               <select
@@ -125,7 +160,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                 required
                 value={formData.payment_method_id}
                 onChange={(e) => setFormData({ ...formData, payment_method_id: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
               >
                 <option value="">Seleccione un método</option>
                 {paymentMethods.map((method) => (
@@ -137,7 +172,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
             </div>
 
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="amount" className="block text-sm font-medium text-gray-300">
                 Monto
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
@@ -153,18 +188,18 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                  className="block w-full pl-10 pr-12 border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full pl-10 pr-12 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                   placeholder="0.00"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">DOP</span>
+                  <span className="text-gray-400 sm:text-sm">DOP</span>
                 </div>
               </div>
             </div>
 
             {selectedMethod?.requires_reference && (
               <div>
-                <label htmlFor="reference_number" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="reference_number" className="block text-sm font-medium text-gray-300">
                   Número de Referencia
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
@@ -177,7 +212,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                     required
                     value={formData.reference_number}
                     onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                    className="block w-full pl-10 border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="block w-full pl-10 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     placeholder="Número de confirmación"
                   />
                 </div>
@@ -185,7 +220,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
             )}
 
             <div>
-              <label htmlFor="payment_date" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="payment_date" className="block text-sm font-medium text-gray-300">
                 Fecha de Pago
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
@@ -198,13 +233,13 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                   required
                   value={formData.payment_date}
                   onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                  className="block w-full pl-10 border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full pl-10 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
                 Notas
               </label>
               <textarea
@@ -212,7 +247,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                 placeholder="Notas adicionales sobre el pago..."
               />
             </div>
@@ -222,14 +257,14 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="btn btn-secondary"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="btn btn-primary"
             >
               {loading ? 'Procesando...' : 'Registrar Pago'}
             </button>

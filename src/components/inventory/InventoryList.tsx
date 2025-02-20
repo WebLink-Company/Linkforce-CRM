@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Filter, RefreshCw, Download, FlaskRound as Flask } from 'lucide-react';
+import { Package, Search, Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit, FlaskRound as Flask } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { InventoryItem } from '../../types/erp';
 import AddProductModal from './AddProductModal';
@@ -73,154 +73,152 @@ export default function InventoryList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Inventario</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Gestione el inventario de productos, stock y ubicaciones
-          </p>
-        </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
-          <Link
-            to="/materias-primas"
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
-          >
-            <Flask className="h-4 w-4 mr-2" />
-            Materias Primas
-          </Link>
-          <button
-            onClick={() => setShowAddCategoryModal(true)}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 sm:w-auto"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Categoría
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="flex-1">
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar productos..."
-                className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:text-gray-900 focus:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100">
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="sm:flex sm:items-center">
+          <div className="sm:flex-auto">
+            <h1 className="text-2xl font-semibold">Inventario</h1>
+            <p className="mt-2 text-sm text-gray-400">
+              Gestione el inventario de productos, stock y ubicaciones
+            </p>
           </div>
-          <div className="flex gap-2">
-            <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
+            <Link
+              to="/materias-primas"
+              className="btn btn-secondary"
+            >
+              <Flask className="h-4 w-4 mr-2" />
+              Materias Primas
+            </Link>
+            <button
+              onClick={() => setShowAddCategoryModal(true)}
+              className="btn btn-secondary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Categoría
             </button>
             <button
-              onClick={loadInventoryItems}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={() => setShowAddModal(true)}
+              className="btn btn-primary"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Actualizar
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Producto
             </button>
           </div>
         </div>
 
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-          <table className="min-w-full divide-y divide-gray-300">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                  Código
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Producto
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Stock Actual
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Unidad
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Precio
-                </th>
-                <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                  <span className="sr-only">Acciones</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                    {item.code}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {item.name}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {item.current_stock}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {item.unit_measure}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {new Intl.NumberFormat('es-DO', {
-                      style: 'currency',
-                      currency: 'DOP'
-                    }).format(item.unit_price || 0)}
-                  </td>
-                  <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
+        <div className="mt-8">
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar productos..."
+                  className="form-input pl-10"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-secondary"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
+              </button>
+              <button
+                onClick={loadInventoryItems}
+                className="btn btn-secondary"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          <div className="table-container">
+            <table className="min-w-full divide-y divide-white/5">
+              <thead className="table-header">
+                <tr>
+                  <th scope="col" className="table-header th">Código</th>
+                  <th scope="col" className="table-header th">Producto</th>
+                  <th scope="col" className="table-header th">Stock Actual</th>
+                  <th scope="col" className="table-header th">Unidad</th>
+                  <th scope="col" className="table-header th">Precio</th>
+                  <th scope="col" className="relative table-header th">
+                    <span className="sr-only">Acciones</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredItems.map((item) => (
+                  <tr key={item.id} className="table-row">
+                    <td className="table-cell font-medium">{item.code}</td>
+                    <td className="table-cell">{item.name}</td>
+                    <td className="table-cell">
+                      <span className={`status-badge ${
+                        item.current_stock <= item.min_stock ? 'status-badge-error' :
+                        item.current_stock <= item.reorder_point ? 'status-badge-warning' :
+                        'status-badge-success'
+                      }`}>
+                        {item.current_stock}
+                      </span>
+                    </td>
+                    <td className="table-cell">{item.unit_measure}</td>
+                    <td className="table-cell">
+                      {new Intl.NumberFormat('es-DO', {
+                        style: 'currency',
+                        currency: 'DOP'
+                      }).format(item.unit_price || 0)}
+                    </td>
+                    <td className="table-cell-action">
+                      <div className="flex justify-end space-x-3">
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="text-blue-400 hover:text-blue-300"
+                          title="Editar"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-400 hover:text-red-300"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        <AddProductModal
+          isOpen={showAddModal}
+          onClose={handleModalClose}
+          onSuccess={loadInventoryItems}
+          editingItem={editingItem}
+        />
+
+        <AddCategoryModal
+          isOpen={showAddCategoryModal}
+          onClose={() => setShowAddCategoryModal(false)}
+          onSuccess={loadInventoryItems}
+        />
       </div>
-
-      <AddProductModal
-        isOpen={showAddModal}
-        onClose={handleModalClose}
-        onSuccess={loadInventoryItems}
-        editingItem={editingItem}
-      />
-
-      <AddCategoryModal
-        isOpen={showAddCategoryModal}
-        onClose={() => setShowAddCategoryModal(false)}
-        onSuccess={loadInventoryItems}
-      />
     </div>
   );
 }

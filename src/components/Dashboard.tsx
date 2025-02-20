@@ -1,286 +1,164 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Package, FileText, DollarSign, CreditCard, Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
+import { FileText, Users, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, Package, Beaker, Atom } from 'lucide-react';
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState({
-    totalUsers: 0,
-    activeProducts: 0,
-    pendingInvoices: 0,
-    monthlyRevenue: { total: 0, growth: 0 },
-    accountsReceivable: { total: 0, count: 0 },
-    accountsPayable: { total: 0, count: 0 }
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadMetrics();
-  }, []);
-
-  const loadMetrics = async () => {
-    try {
-      // Get total users
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      // Get active products
-      const { count: productsCount } = await supabase
-        .from('inventory_items')
-        .select('*', { count: 'exact', head: true })
-        .gt('current_stock', 0);
-
-      // Get pending invoices
-      const { count: invoicesCount } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'issued')
-        .eq('payment_status', 'pending');
-
-      // Get monthly revenue
-      const { data: revenueData } = await supabase
-        .rpc('get_monthly_income', { 
-          p_year: new Date().getFullYear(), 
-          p_month: new Date().getMonth() + 1 
-        });
-
-      // Get accounts receivable
-      const { data: receivablesData } = await supabase
-        .rpc('get_accounts_receivable');
-
-      // Get accounts payable
-      const { data: payablesData } = await supabase
-        .rpc('get_accounts_payable');
-
-      setMetrics({
-        totalUsers: usersCount || 0,
-        activeProducts: productsCount || 0,
-        pendingInvoices: invoicesCount || 0,
-        monthlyRevenue: {
-          total: revenueData?.total || 0,
-          growth: revenueData?.growth_rate || 0
-        },
-        accountsReceivable: {
-          total: receivablesData?.total || 0,
-          count: receivablesData?.count || 0
-        },
-        accountsPayable: {
-          total: payablesData?.total || 0,
-          count: payablesData?.count || 0
-        }
-      });
-    } catch (error) {
-      console.error('Error loading metrics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const { user } = useAuth();
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'Usuario';
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Vista general del sistema y métricas principales
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+      {/* Hero Section */}
+      <div className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+        {/* Animated Background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
+        </div>
+
+        <div className="relative z-10 text-center px-4">
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+              <Atom className="w-10 h-10 text-white" />
+            </div>
+          </div>
+
+          {/* Greeting */}
+          <h1 className="text-5xl font-bold mb-4">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
+              Hola {firstName}
+            </span>
+          </h1>
+          <p className="text-2xl text-gray-300 mb-12">
+            ¿En qué vamos a trabajar hoy?
           </p>
+
+          {/* Quick Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <Link to="/facturacion" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <FileText className="w-8 h-8 text-emerald-400 mb-2" />
+                <span className="text-gray-100 font-medium">Crear Factura</span>
+              </div>
+            </Link>
+
+            <Link to="/clientes" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <Users className="w-8 h-8 text-purple-400 mb-2" />
+                <span className="text-gray-100 font-medium">Nuevo Cliente</span>
+              </div>
+            </Link>
+
+            <Link to="/finanzas" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <BarChart className="w-8 h-8 text-blue-400 mb-2" />
+                <span className="text-gray-100 font-medium">Reporte de Ventas</span>
+              </div>
+            </Link>
+
+            <Link to="/inventario" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <Package className="w-8 h-8 text-yellow-400 mb-2" />
+                <span className="text-gray-100 font-medium">Inventario</span>
+              </div>
+            </Link>
+
+            <Link to="/materias-primas" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <Flask className="w-8 h-8 text-pink-400 mb-2" />
+                <span className="text-gray-100 font-medium">Materias Primas</span>
+              </div>
+            </Link>
+
+            <Link to="/cumplimiento" 
+              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
+              <div className="flex flex-col items-center">
+                <Beaker className="w-8 h-8 text-red-400 mb-2" />
+                <span className="text-gray-100 font-medium">Control de Calidad</span>
+              </div>
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Main Metrics Grid */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Monthly Revenue */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <DollarSign className="h-6 w-6 text-green-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Ingresos del Mes
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {new Intl.NumberFormat('es-DO', {
-                        style: 'currency',
-                        currency: 'DOP'
-                      }).format(metrics.monthlyRevenue.total)}
-                    </div>
-                    {metrics.monthlyRevenue.growth !== 0 && (
-                      <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                        metrics.monthlyRevenue.growth > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        <TrendingUp className="self-center flex-shrink-0 h-4 w-4 mr-1" />
-                        {metrics.monthlyRevenue.growth.toFixed(1)}%
+      {/* Dashboard Content */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Monthly Income */}
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <FileSpreadsheet className="h-6 w-6 text-green-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Ingresos del Mes
+                    </dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-gray-100">
+                        RD$58,744.00
                       </div>
-                    )}
-                  </dd>
-                </dl>
+                      <div className="ml-2 flex items-baseline text-sm font-semibold text-green-400">
+                        <Plus className="self-center flex-shrink-0 h-4 w-4" />
+                        <span className="sr-only">Increased by</span>
+                        12.5%
+                      </div>
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/finanzas" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Ver detalles
-            </Link>
-          </div>
-        </div>
 
-        {/* Accounts Receivable */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CreditCard className="h-6 w-6 text-blue-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Cuentas por Cobrar
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {new Intl.NumberFormat('es-DO', {
-                        style: 'currency',
-                        currency: 'DOP'
-                      }).format(metrics.accountsReceivable.total)}
-                    </div>
-                    <div className="ml-2 text-sm text-gray-500">
-                      ({metrics.accountsReceivable.count} facturas)
-                    </div>
-                  </dd>
-                </dl>
+          {/* Active Products */}
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Package className="h-6 w-6 text-indigo-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Productos Activos
+                    </dt>
+                    <dd className="text-2xl font-semibold text-gray-100">
+                      143
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/facturacion" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Ver facturas
-            </Link>
-          </div>
-        </div>
 
-        {/* Accounts Payable */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Wallet className="h-6 w-6 text-purple-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Cuentas por Pagar
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {new Intl.NumberFormat('es-DO', {
-                        style: 'currency',
-                        currency: 'DOP'
-                      }).format(metrics.accountsPayable.total)}
-                    </div>
-                    <div className="ml-2 text-sm text-gray-500">
-                      ({metrics.accountsPayable.count} facturas)
-                    </div>
-                  </dd>
-                </dl>
+          {/* Active Users */}
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Users className="h-6 w-6 text-orange-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Usuarios Activos
+                    </dt>
+                    <dd className="text-2xl font-semibold text-gray-100">
+                      12
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/cuentas-por-pagar" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Ver facturas
-            </Link>
-          </div>
-        </div>
-
-        {/* Active Products */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Package className="h-6 w-6 text-indigo-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Productos Activos
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {metrics.activeProducts}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/inventario" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Ver inventario
-            </Link>
-          </div>
-        </div>
-
-        {/* Pending Invoices */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FileText className="h-6 w-6 text-yellow-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Facturas Pendientes
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {metrics.pendingInvoices}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/facturacion" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Ver facturas
-            </Link>
-          </div>
-        </div>
-
-        {/* Active Users */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Users className="h-6 w-6 text-orange-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Usuarios Activos
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {metrics.totalUsers}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <Link to="/usuarios" className="text-sm font-medium text-blue-700 hover:text-blue-900">
-              Gestionar usuarios
-            </Link>
           </div>
         </div>
       </div>
