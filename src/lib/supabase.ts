@@ -35,6 +35,8 @@ export const getCurrentSchema = () => {
   }
   return 'public';
 };
+console.log("Current schema being used:", getCurrentSchema());
+
 
 // Initialize Supabase client with schema header
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
