@@ -9,6 +9,11 @@ interface CreateCorporateCustomerModalProps {
   onSuccess: () => void;
 }
 
+const formSectionClasses = "bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700/50";
+const inputClasses = "mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
+const labelClasses = "block text-sm font-medium text-gray-300";
+const sectionTitleClasses = "text-base font-medium text-white mb-4";
+
 export default function CreateCorporateCustomerModal({ isOpen, onClose, onSuccess }: CreateCorporateCustomerModalProps) {
   const [formData, setFormData] = useState({
     business_name: '',
@@ -144,14 +149,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
-      {/* Glowing Background Effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
       </div>
 
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
-        {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
@@ -174,12 +177,11 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
           )}
 
           <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-              <h3 className="text-base font-medium text-white mb-4">Información Básica</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información Básica</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="business_name" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="business_name" className={labelClasses}>
                     Razón Social *
                   </label>
                   <input
@@ -188,7 +190,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.business_name}
                     onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                   {errors.business_name && (
                     <p className="mt-1 text-sm text-red-400">{errors.business_name}</p>
@@ -196,7 +198,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 </div>
 
                 <div>
-                  <label htmlFor="commercial_name" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="commercial_name" className={labelClasses}>
                     Nombre Comercial
                   </label>
                   <input
@@ -204,12 +206,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     id="commercial_name"
                     value={formData.commercial_name}
                     onChange={(e) => setFormData({ ...formData, commercial_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="identification_number" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="identification_number" className={labelClasses}>
                     RNC *
                   </label>
                   <input
@@ -218,7 +220,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.identification_number}
                     onChange={(e) => setFormData({ ...formData, identification_number: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                   {errors.identification_number && (
                     <p className="mt-1 text-sm text-red-400">{errors.identification_number}</p>
@@ -226,7 +228,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 </div>
 
                 <div>
-                  <label htmlFor="website" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="website" className={labelClasses}>
                     Sitio Web
                   </label>
                   <input
@@ -234,7 +236,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     id="website"
                     value={formData.website}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
               </div>
@@ -248,12 +250,11 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
               </div>
             </div>
 
-            {/* Contact Information */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-              <h3 className="text-base font-medium text-white mb-4">Información de Contacto</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información de Contacto</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="email" className={labelClasses}>
                     Email *
                   </label>
                   <input
@@ -262,7 +263,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                   {errors.email && (
                     <p className="mt-1 text-sm text-red-400">{errors.email}</p>
@@ -270,7 +271,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="phone" className={labelClasses}>
                     Teléfono *
                   </label>
                   <input
@@ -279,7 +280,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                   {errors.phone && (
                     <p className="mt-1 text-sm text-red-400">{errors.phone}</p>
@@ -288,7 +289,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
 
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label htmlFor="street" className="block text-sm font-medium text-gray-300">
+                    <label htmlFor="street" className={labelClasses}>
                       Calle *
                     </label>
                     <input
@@ -297,12 +298,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                       required
                       value={formData.street}
                       onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                      className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                      className={inputClasses}
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="street_number" className="block text-sm font-medium text-gray-300">
+                    <label htmlFor="street_number" className={labelClasses}>
                       Número
                     </label>
                     <input
@@ -310,12 +311,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                       id="street_number"
                       value={formData.street_number}
                       onChange={(e) => setFormData({ ...formData, street_number: e.target.value })}
-                      className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                      className={inputClasses}
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="postal_code" className="block text-sm font-medium text-gray-300">
+                    <label htmlFor="postal_code" className={labelClasses}>
                       Código Postal
                     </label>
                     <input
@@ -323,13 +324,13 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                       id="postal_code"
                       value={formData.postal_code}
                       onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                      className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                      className={inputClasses}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="city" className={labelClasses}>
                     Ciudad *
                   </label>
                   <input
@@ -338,12 +339,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="state" className={labelClasses}>
                     Provincia *
                   </label>
                   <input
@@ -352,18 +353,17 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.state}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Contact Person */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-              <h3 className="text-base font-medium text-white mb-4">Contacto Principal</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Contacto Principal</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="contact_name" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="contact_name" className={labelClasses}>
                     Nombre
                   </label>
                   <input
@@ -371,12 +371,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     id="contact_name"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact_position" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="contact_position" className={labelClasses}>
                     Cargo
                   </label>
                   <input
@@ -384,12 +384,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     id="contact_position"
                     value={formData.contact_position}
                     onChange={(e) => setFormData({ ...formData, contact_position: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="contact_phone" className={labelClasses}>
                     Teléfono
                   </label>
                   <input
@@ -397,18 +397,17 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     id="contact_phone"
                     value={formData.contact_phone}
                     onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Billing Information */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-              <h3 className="text-base font-medium text-white mb-4">Información de Facturación</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información de Facturación</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="invoice_type" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="invoice_type" className={labelClasses}>
                     Tipo de Comprobante *
                   </label>
                   <select
@@ -416,7 +415,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.invoice_type}
                     onChange={(e) => setFormData({ ...formData, invoice_type: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   >
                     <option value="">Seleccione un tipo</option>
                     <option value="B01">Factura de Crédito Fiscal (B01)</option>
@@ -427,7 +426,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 </div>
 
                 <div>
-                  <label htmlFor="payment_terms" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="payment_terms" className={labelClasses}>
                     Condiciones de Pago *
                   </label>
                   <select
@@ -435,7 +434,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.payment_terms}
                     onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className={inputClasses}
                   >
                     <option value="">Seleccione condición</option>
                     <option value="contado">Contado</option>
@@ -447,12 +446,12 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 </div>
 
                 <div>
-                  <label htmlFor="credit_limit" className="block text-sm font-medium text-gray-300">
+                  <label htmlFor="credit_limit" className={labelClasses}>
                     Límite de Crédito
                   </label>
                   <div className="mt-1 relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">RD$</span>
+                      <span className="text-gray-400 sm:text-sm">RD$</span>
                     </div>
                     <input
                       type="number"
@@ -461,16 +460,15 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                       step="0.01"
                       value={formData.credit_limit}
                       onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
-                      className="block w-full pl-12 pr-12 bg-gray-700/50 border-gray-600 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                      className={`${inputClasses} pl-12`}
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Notes */}
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
+            <div className={formSectionClasses}>
+              <label htmlFor="notes" className={labelClasses}>
                 Notas
               </label>
               <textarea
@@ -478,7 +476,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                className={inputClasses}
               />
             </div>
           </div>

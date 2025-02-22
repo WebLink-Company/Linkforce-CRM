@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, CreditCard, FileText, ArrowUpRight, ArrowDownLeft, ChevronDown, ChevronUp, Wallet, Calculator, PieChart, BarChart } from 'lucide-react';
-import { financeAPI } from '../../lib/api/finance';
+import { useAuth } from '../../hooks/useAuth';
+import { Link } from 'react-router-dom';
+import { DollarSign, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, Package, Beaker, Atom, Calculator, PieChart, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import AccountSelector from './AccountSelector';
 import AccountMovements from './AccountMovements';
 import PendingReceivables from './PendingReceivables';
 import PendingPayables from './PendingPayables';
+import type { SupplierInvoice } from '../../types/payables';
+import InvoiceViewerModal from '../payables/SupplierInvoiceViewer';
 
 interface FinancialMetrics {
   monthlyIncome: {
@@ -55,9 +58,13 @@ export default function FinanceOverview() {
     averageCollectionPeriod: 0
   });
   const [loading, setLoading] = useState(true);
+  const [payables, setPayables] = useState([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   useEffect(() => {
     loadFinancialMetrics();
+    loadPayables();
   }, []);
 
   useEffect(() => {
@@ -65,6 +72,16 @@ export default function FinanceOverview() {
       loadAccountBalance();
     }
   }, [selectedAccount]);
+
+  const loadPayables = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_pending_payables');
+      if (error) throw error;
+      setPayables(data || []);
+    } catch (error) {
+      console.error('Error loading payables:', error);
+    }
+  };
 
   const loadFinancialMetrics = async () => {
     try {
@@ -135,15 +152,20 @@ export default function FinanceOverview() {
 
   const loadAccountBalance = async () => {
     try {
-      const { data, error } = await financeAPI.getAccountBalance(
-        selectedAccount,
-        new Date().toISOString().split('T')[0]
-      );
+      const { data, error } = await supabase.rpc('get_account_balance', {
+        p_account_id: selectedAccount,
+        p_as_of_date: new Date().toISOString().split('T')[0]
+      });
       if (error) throw error;
       setAccountBalance(data?.balance || 0);
     } catch (error) {
       console.error('Error loading account balance:', error);
     }
+  };
+
+  const handleViewInvoice = (invoice: SupplierInvoice) => {
+    setSelectedInvoice(invoice);
+    setShowInvoiceModal(true);
   };
 
   const formatCurrency = (amount: number) => {
@@ -160,310 +182,214 @@ export default function FinanceOverview() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Finanzas</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Gestión financiera y contable de la empresa
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100">
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="sm:flex sm:items-center">
+          <div className="sm:flex-auto">
+            <h1 className="text-2xl font-semibold">Finanzas</h1>
+            <p className="mt-2 text-sm text-gray-400">
+              Gestión financiera y contable de la empresa
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Main Metrics Grid */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Ingresos */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ArrowDownLeft className="h-6 w-6 text-green-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Ingresos del Mes
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(metrics.monthlyIncome.total)}
-                    </div>
-                    {metrics.monthlyIncome.growthRate !== 0 && (
-                      <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                        metrics.monthlyIncome.growthRate > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        <TrendingUp className="self-center flex-shrink-0 h-4 w-4" />
-                        <span className="ml-1">
-                          {formatPercentage(metrics.monthlyIncome.growthRate)}
-                        </span>
+        {/* Main Metrics Grid */}
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Ingresos */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <DollarSign className="h-6 w-6 text-emerald-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Ingresos del Mes
+                    </dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
+                        {formatCurrency(metrics.monthlyIncome.total)}
                       </div>
-                    )}
-                  </dd>
-                </dl>
+                      {metrics.monthlyIncome.growthRate !== 0 && (
+                        <div className={`ml-2 flex items-baseline text-sm font-semibold ${
+                          metrics.monthlyIncome.growthRate > 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          <Plus className="self-center flex-shrink-0 h-4 w-4" />
+                          <span className="sr-only">Increased by</span>
+                          {metrics.monthlyIncome.growthRate.toFixed(1)}%
+                        </div>
+                      )}
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Gastos */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ArrowUpRight className="h-6 w-6 text-red-500" />
+          {/* Active Products */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Package className="h-6 w-6 text-indigo-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Productos Activos
+                    </dt>
+                    <dd className="text-2xl font-semibold text-white">
+                      {metrics.activeProducts}
+                    </dd>
+                  </dl>
+                </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Gastos del Mes
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(metrics.operatingExpenses.total)}
-                    </div>
-                    {metrics.operatingExpenses.growthRate !== 0 && (
-                      <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                        metrics.operatingExpenses.growthRate > 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        <TrendingUp className="self-center flex-shrink-0 h-4 w-4" />
-                        <span className="ml-1">
-                          {formatPercentage(metrics.operatingExpenses.growthRate)}
-                        </span>
+            </div>
+          </div>
+
+          {/* Cuentas por Cobrar */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Calculator className="h-6 w-6 text-blue-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Cuentas por Cobrar
+                    </dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
+                        {formatCurrency(metrics.accountsReceivable.total)}
                       </div>
-                    )}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cuentas por Cobrar */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CreditCard className="h-6 w-6 text-blue-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Cuentas por Cobrar
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(metrics.accountsReceivable.total)}
-                    </div>
-                    <div className="ml-2 text-sm text-gray-500">
-                      ({metrics.accountsReceivable.count} facturas)
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cuentas por Pagar */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Wallet className="h-6 w-6 text-purple-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Cuentas por Pagar
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(metrics.accountsPayable.total)}
-                    </div>
-                    <div className="ml-2 text-sm text-gray-500">
-                      ({metrics.accountsPayable.count} facturas)
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Additional Metrics */}
-        {/* Balance de Efectivo */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Calculator className="h-6 w-6 text-indigo-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Balance de Efectivo
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(metrics.cashBalance.total)}
-                    </div>
-                    {metrics.cashBalance.total !== metrics.cashBalance.previousTotal && (
-                      <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                        metrics.cashBalance.total > metrics.cashBalance.previousTotal 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                      }`}>
-                        <TrendingUp className="self-center flex-shrink-0 h-4 w-4" />
-                        <span className="ml-1">
-                          {formatPercentage(
-                            ((metrics.cashBalance.total - metrics.cashBalance.previousTotal) / 
-                             Math.abs(metrics.cashBalance.previousTotal)) * 100
-                          )}
-                        </span>
+                      <div className="ml-2 text-sm text-gray-400">
+                        ({metrics.accountsReceivable.count} facturas)
                       </div>
-                    )}
-                  </dd>
-                </dl>
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Margen de Beneficio */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <PieChart className="h-6 w-6 text-yellow-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Margen de Beneficio
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {formatPercentage(metrics.profitMargin.current)}
-                    </div>
-                    {metrics.profitMargin.current !== metrics.profitMargin.previous && (
-                      <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                        metrics.profitMargin.current > metrics.profitMargin.previous 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                      }`}>
-                        <TrendingUp className="self-center flex-shrink-0 h-4 w-4" />
-                        <span className="ml-1">
-                          {formatPercentage(metrics.profitMargin.current - metrics.profitMargin.previous)}
-                        </span>
+          {/* Cuentas por Pagar */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Wallet className="h-6 w-6 text-purple-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Cuentas por Pagar
+                    </dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
+                        {formatCurrency(metrics.accountsPayable.total)}
                       </div>
-                    )}
-                  </dd>
-                </dl>
+                      <div className="ml-2 text-sm text-gray-400">
+                        ({metrics.accountsPayable.count} facturas)
+                      </div>
+                    </dd>
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Período Medio de Cobro */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <BarChart className="h-6 w-6 text-orange-500" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Período Medio de Cobro
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {metrics.averageCollectionPeriod} días
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Account Selection */}
-      <div className="mt-8 bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="mb-6">
-            <label htmlFor="account" className="block text-sm font-medium text-gray-700">
-              Seleccionar Cuenta
-            </label>
-            <div className="mt-1">
-              <AccountSelector
-                value={selectedAccount}
-                onChange={setSelectedAccount}
-              />
-            </div>
-          </div>
-
-          {selectedAccount && (
-            <>
-              <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-gray-700">Balance Actual</h3>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                  {accountBalance !== null ? formatCurrency(accountBalance) : 'Cargando...'}
-                </p>
-              </div>
-
-              <AccountMovements accountId={selectedAccount} />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Accounts Receivable Section */}
-      <div className="mt-8">
-        <div className="bg-white shadow rounded-lg">
+        {/* Account Selection */}
+        <div className="mt-8 bg-gray-800/50 shadow rounded-lg border border-white/10">
           <div className="px-4 py-5 sm:p-6">
-            <button
-              onClick={() => setShowReceivables(!showReceivables)}
-              className="flex justify-between items-center w-full"
-            >
-              <h3 className="text-lg font-medium leading-6 text-gray-900">
-                Cuentas por Cobrar
-              </h3>
-              {showReceivables ? (
-                <ChevronUp className="h-5 w-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-gray-500" />
-              )}
-            </button>
-            {showReceivables && <PendingReceivables />}
-          </div>
-        </div>
-      </div>
+            <div className="mb-6">
+              <label htmlFor="account" className="block text-sm font-medium text-gray-300">
+                Seleccionar Cuenta
+              </label>
+              <div className="mt-1">
+                <AccountSelector
+                  value={selectedAccount}
+                  onChange={setSelectedAccount}
+                />
+              </div>
+            </div>
 
-      {/* Accounts Payable Section */}
-      <div className="mt-8">
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <button
-              onClick={() => setShowPayables(!showPayables)}
-              className="flex justify-between items-center w-full"
-            >
-              <h3 className="text-lg font-medium leading-6 text-gray-900">
-                Cuentas por Pagar
-              </h3>
-              {showPayables ? (
-                <ChevronUp className="h-5 w-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-gray-500" />
-              )}
-            </button>
-            {showPayables && <PendingPayables />}
+            {selectedAccount && (
+              <>
+                <div className="mb-6 bg-gray-900/50 p-4 rounded-lg border border-white/20">
+                  <h3 className="text-sm font-medium text-gray-300">Balance Actual</h3>
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    {accountBalance !== null ? formatCurrency(accountBalance) : 'Cargando...'}
+                  </p>
+                </div>
+
+                <AccountMovements accountId={selectedAccount} />
+              </>
+            )}
           </div>
         </div>
+
+        {/* Accounts Receivable Section */}
+        <div className="mt-8">
+          <div className="bg-gray-800/50 shadow rounded-lg border border-white/10">
+            <div className="px-4 py-5 sm:p-6">
+              <button
+                onClick={() => setShowReceivables(!showReceivables)}
+                className="flex justify-between items-center w-full"
+              >
+                <h3 className="text-lg font-medium text-white">
+                  Cuentas por Cobrar
+                </h3>
+                {showReceivables ? (
+                  <ChevronUp className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+              {showReceivables && <PendingReceivables />}
+            </div>
+          </div>
+        </div>
+
+        {/* Accounts Payable Section */}
+        <div className="mt-8">
+          <div className="bg-gray-800/50 shadow rounded-lg border border-white/10">
+            <div className="px-4 py-5 sm:p-6">
+              <button
+                onClick={() => setShowPayables(!showPayables)}
+                className="flex justify-between items-center w-full"
+              >
+                <h3 className="text-lg font-medium text-white">
+                  Cuentas por Pagar
+                </h3>
+                {showPayables ? (
+                  <ChevronUp className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+              {showPayables && <PendingPayables payables={payables} onView={handleViewInvoice} />}
+            </div>
+          </div>
+        </div>
+
+        {/* Invoice Viewer Modal */}
+        <InvoiceViewerModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setSelectedInvoice(null);
+          }}
+          invoice={selectedInvoice}
+        />
       </div>
     </div>
   );

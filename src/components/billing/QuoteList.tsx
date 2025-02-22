@@ -1,61 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit } from 'lucide-react';
-import { payablesAPI } from '../../lib/api/payables';
-import type { Expense } from '../../types/payables';
-import CreateExpenseModal from './CreateExpenseModal';
-import ExpenseViewerModal from './ExpenseViewerModal';
+import { FileText, Search, Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import type { Quote } from '../../types/billing';
+import CreateQuoteModal from './CreateQuoteModal';
+import QuoteViewerModal from './QuoteViewerModal';
 import { exportToCSV } from '../../utils/export';
+import { Link } from 'react-router-dom';
 
-export default function ExpenseList() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+export default function QuoteList() {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showViewerModal, setShowViewerModal] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    loadExpenses();
+    loadQuotes();
   }, []);
 
-  const loadExpenses = async () => {
+  const loadQuotes = async () => {
     try {
-      const { data, error } = await payablesAPI.getExpenses();
+      const { data, error } = await supabase
+        .from('quotes')
+        .select(`
+          *,
+          customer:customers(*),
+          items:quote_items(
+            *,
+            product:inventory_items(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      setExpenses(data || []);
+      setQuotes(data || []);
     } catch (error) {
-      console.error('Error loading expenses:', error);
+      console.error('Error loading quotes:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleExport = () => {
-    if (expenses.length > 0) {
-      exportToCSV(expenses, 'expenses');
+    if (quotes.length > 0) {
+      exportToCSV(quotes, 'quotes');
     }
   };
 
-  const handleView = (expense: Expense) => {
-    setSelectedExpense(expense);
+  const handleView = (quote: Quote) => {
+    setSelectedQuote(quote);
     setShowViewerModal(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Está seguro que desea eliminar este gasto?')) {
-      try {
-        const { error } = await supabase
-          .from('expenses')
-          .delete()
-          .eq('id', id);
+    if (!window.confirm('¿Está seguro que desea eliminar esta cotización?')) {
+      return;
+    }
 
-        if (error) throw error;
-        await loadExpenses();
-      } catch (error) {
-        console.error('Error deleting expense:', error);
-      }
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadQuotes();
+    } catch (error) {
+      console.error('Error deleting quote:', error);
     }
   };
+
+  const filteredQuotes = quotes.filter(quote =>
+    quote.number.toLowerCase().includes(search.toLowerCase()) ||
+    quote.customer?.full_name.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -70,12 +90,19 @@ export default function ExpenseList() {
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="sm:flex sm:items-center">
           <div className="sm:flex-auto">
-            <h2 className="text-xl font-semibold">Gastos</h2>
+            <h2 className="text-xl font-semibold">Cotizaciones</h2>
             <p className="mt-2 text-sm text-gray-400">
-              Gestión de gastos operativos y administrativos
+              Gestión de cotizaciones para clientes
             </p>
           </div>
           <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
+            <Link
+              to="/facturacion"
+              className="btn btn-secondary"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Facturación
+            </Link>
             <button
               onClick={handleExport}
               className="btn btn-secondary"
@@ -88,13 +115,27 @@ export default function ExpenseList() {
               className="btn btn-primary"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Nuevo Gasto
+              Nueva Cotización
             </button>
           </div>
         </div>
 
         <div className="mt-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar cotizaciones..."
+                  className="form-input pl-10"
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -104,7 +145,7 @@ export default function ExpenseList() {
                 Filtros
               </button>
               <button
-                onClick={loadExpenses}
+                onClick={loadQuotes}
                 className="btn btn-secondary"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -118,8 +159,8 @@ export default function ExpenseList() {
               <thead className="table-header">
                 <tr>
                   <th scope="col" className="table-header th">Número</th>
-                  <th scope="col" className="table-header th">Categoría</th>
-                  <th scope="col" className="table-header th">Descripción</th>
+                  <th scope="col" className="table-header th">Cliente</th>
+                  <th scope="col" className="table-header th">Fecha</th>
                   <th scope="col" className="table-header th text-right">Total</th>
                   <th scope="col" className="table-header th text-center">Estado</th>
                   <th scope="col" className="relative table-header th">
@@ -128,48 +169,52 @@ export default function ExpenseList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {expenses.map((expense) => (
-                  <tr key={expense.id} className="table-row">
-                    <td className="table-cell font-medium">{expense.number}</td>
-                    <td className="table-cell">{expense.category?.name}</td>
-                    <td className="table-cell">{expense.description}</td>
+                {filteredQuotes.map((quote) => (
+                  <tr key={quote.id} className="table-row">
+                    <td className="table-cell font-medium">{quote.number}</td>
+                    <td className="table-cell">{quote.customer?.full_name}</td>
+                    <td className="table-cell">
+                      {new Date(quote.issue_date).toLocaleDateString()}
+                    </td>
                     <td className="table-cell text-right">
                       {new Intl.NumberFormat('es-DO', {
                         style: 'currency',
                         currency: 'DOP'
-                      }).format(expense.total_amount)}
+                      }).format(quote.total_amount)}
                     </td>
                     <td className="table-cell text-center">
                       <span className={`status-badge ${
-                        expense.status === 'approved' ? 'status-badge-success' :
-                        expense.status === 'rejected' ? 'status-badge-error' :
+                        quote.status === 'approved' ? 'status-badge-success' :
+                        quote.status === 'rejected' ? 'status-badge-error' :
+                        quote.status === 'converted' ? 'status-badge-info' :
                         'status-badge-warning'
                       }`}>
-                        {expense.status === 'approved' ? 'Aprobado' :
-                         expense.status === 'rejected' ? 'Rechazado' :
+                        {quote.status === 'approved' ? 'Aprobada' :
+                         quote.status === 'rejected' ? 'Rechazada' :
+                         quote.status === 'converted' ? 'Convertida' :
                          'Pendiente'}
                       </span>
                     </td>
                     <td className="table-cell-action">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end space-x-3">
                         <button
-                          onClick={() => handleView(expense)}
+                          onClick={() => handleView(quote)}
                           className="action-icon-button"
                           title="Ver detalles"
                         >
                           <Eye className="h-5 w-5" />
                         </button>
-                        {expense.status === 'pending' && (
+                        {quote.status === 'pending' && (
                           <>
                             <button
-                              onClick={() => handleView(expense)}
+                              onClick={() => handleView(quote)}
                               className="action-icon-button"
                               title="Editar"
                             >
                               <Edit className="h-5 w-5" />
                             </button>
                             <button
-                              onClick={() => handleDelete(expense.id)}
+                              onClick={() => handleDelete(quote.id)}
                               className="text-red-400 hover:text-red-300 action-icon-button"
                               title="Eliminar"
                             >
@@ -186,20 +231,19 @@ export default function ExpenseList() {
           </div>
         </div>
 
-        <CreateExpenseModal
+        <CreateQuoteModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          onSuccess={loadExpenses}
+          onSuccess={loadQuotes}
         />
 
-        <ExpenseViewerModal
+        <QuoteViewerModal
           isOpen={showViewerModal}
           onClose={() => {
             setShowViewerModal(false);
-            setSelectedExpense(null);
+            setSelectedQuote(null);
           }}
-          expense={selectedExpense}
-          onSuccess={loadExpenses}
+          quote={selectedQuote}
         />
       </div>
     </div>

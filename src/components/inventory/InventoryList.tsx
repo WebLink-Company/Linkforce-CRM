@@ -17,9 +17,11 @@ export default function InventoryList() {
 
   const loadInventoryItems = async () => {
     try {
+      // Simplified query without deleted_at filter since we don't have that column
       const { data, error } = await supabase
         .from('inventory_items')
         .select('*')
+        .eq('status', 'active')
         .order('name');
 
       if (error) throw error;
@@ -46,9 +48,10 @@ export default function InventoryList() {
     }
 
     try {
+      // Instead of using deleted_at, we'll update the status to 'inactive'
       const { error } = await supabase
         .from('inventory_items')
-        .delete()
+        .update({ status: 'inactive' })
         .eq('id', id);
 
       if (error) throw error;

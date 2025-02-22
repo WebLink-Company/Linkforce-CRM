@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Building2, Mail, MapPin, Phone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { Supplier } from '../../types/payables';
-import CreatePurchaseProductModal from './CreatePurchaseProductModal';
+import CustomerSelector from './CustomerSelector';
+import type { Customer } from '../../types/customer';
+import CustomerTypeDialog from '../customers/CustomerTypeDialog';
+import CreateCustomerModal from '../customers/CreateCustomerModal';
+import CreateCorporateCustomerModal from '../customers/CreateCorporateCustomerModal';
 
-interface CreatePurchaseModalProps {
+interface CreateQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: CreatePurchaseModalProps) {
+export default function CreateQuoteModal({ isOpen, onClose, onSuccess }: CreateQuoteModalProps) {
   const [formData, setFormData] = useState({
-    supplier_id: '',
+    customer_id: '',
     issue_date: new Date().toISOString().split('T')[0],
-    expected_date: '',
+    valid_until: '',
     notes: '',
   });
 
@@ -29,51 +32,25 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
     total_amount: 0
   }]);
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
-  const [totals, setTotals] = useState({
-    subtotal: 0,
-    tax_amount: 0,
-    discount_amount: 0,
-    total_amount: 0
-  });
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [showCreateCorporateCustomerModal, setShowCreateCorporateCustomerModal] = useState(false);
+  const [showCustomerTypeDialog, setShowCustomerTypeDialog] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      loadSuppliers();
       loadProducts();
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    calculateTotals();
-  }, [items]);
-
-  const loadSuppliers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .is('deleted_at', null)
-        .order('business_name');
-
-      if (error) throw error;
-      setSuppliers(data || []);
-    } catch (error) {
-      console.error('Error loading suppliers:', error);
-    }
-  };
-
   const loadProducts = async () => {
     try {
       const { data, error } = await supabase
-        .from('purchase_products')
+        .from('inventory_items')
         .select('*')
-        .is('deleted_at', null)
-        .eq('status', 'active')
         .order('name');
 
       if (error) throw error;
@@ -83,59 +60,37 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
     }
   };
 
-  const calculateTotals = () => {
-    const newTotals = items.reduce((acc, item) => ({
-      subtotal: acc.subtotal + (item.quantity * item.unit_price),
-      tax_amount: acc.tax_amount + item.tax_amount,
-      discount_amount: acc.discount_amount + item.discount_amount,
-      total_amount: acc.total_amount + item.total_amount
-    }), {
-      subtotal: 0,
-      tax_amount: 0,
-      discount_amount: 0,
-      total_amount: 0
-    });
-
-    setTotals(newTotals);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('No authenticated user found');
-      }
-
-      // Create purchase order
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('purchase_orders')
+      // Create quote
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
         .insert([{
-          supplier_id: formData.supplier_id,
+          customer_id: formData.customer_id,
           issue_date: formData.issue_date,
-          expected_date: formData.expected_date || null,
+          valid_until: formData.valid_until,
+          subtotal: items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0),
+          tax_amount: items.reduce((sum, item) => sum + item.tax_amount, 0),
+          discount_amount: items.reduce((sum, item) => sum + item.discount_amount, 0),
+          total_amount: items.reduce((sum, item) => sum + item.total_amount, 0),
+          status: 'pending',
           notes: formData.notes,
-          subtotal: totals.subtotal,
-          tax_amount: totals.tax_amount,
-          discount_amount: totals.discount_amount,
-          total_amount: totals.total_amount,
-          status: 'draft',
-          created_by: user.id
+          created_by: (await supabase.auth.getUser()).data.user?.id
         }])
         .select()
         .single();
 
-      if (purchaseError) throw purchaseError;
+      if (quoteError) throw quoteError;
 
-      if (!purchase) throw new Error('Failed to create purchase order');
+      if (!quote) throw new Error('Failed to create quote');
 
-      // Create purchase order items
-      const purchaseItems = items.map(item => ({
-        purchase_order_id: purchase.id,
+      // Create quote items
+      const quoteItems = items.map(item => ({
+        quote_id: quote.id,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -147,16 +102,16 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
       }));
 
       const { error: itemsError } = await supabase
-        .from('purchase_order_items')
-        .insert(purchaseItems);
+        .from('quote_items')
+        .insert(quoteItems);
 
       if (itemsError) throw itemsError;
 
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error creating purchase:', error);
-      setError(error instanceof Error ? error.message : 'Error creating purchase order');
+      console.error('Error creating quote:', error);
+      setError(error instanceof Error ? error.message : 'Error creating quote');
     } finally {
       setLoading(false);
     }
@@ -190,7 +145,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
       }
     }
     
-    // Recalculate item totals
+    // Recalculate totals
     const subtotal = item.quantity * item.unit_price;
     const discount = subtotal * (item.discount_rate / 100);
     const taxable = subtotal - discount;
@@ -204,10 +159,34 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
     setItems(newItems);
   };
 
+  const handleCustomerTypeSelect = (type: string) => {
+    setShowCustomerTypeDialog(false);
+    if (type === 'individual') {
+      setShowCreateCustomerModal(true);
+    } else {
+      setShowCreateCorporateCustomerModal(true);
+    }
+  };
+
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData(prev => ({
+      ...prev,
+      customer_id: customer.id
+    }));
+  };
+
   if (!isOpen) return null;
 
+  const totals = items.reduce((acc, item) => ({
+    subtotal: acc.subtotal + (item.quantity * item.unit_price),
+    tax_amount: acc.tax_amount + item.tax_amount,
+    discount_amount: acc.discount_amount + item.discount_amount,
+    total_amount: acc.total_amount + item.total_amount
+  }), { subtotal: 0, tax_amount: 0, discount_amount: 0, total_amount: 0 });
+
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
@@ -217,8 +196,8 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
           <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
         </div>
 
-        <div className="flex justify-between items-center p-4 border-b border-white/10 sticky top-0 bg-gray-900/95 z-10">
-          <h2 className="text-lg font-semibold text-white">Nueva Orden de Compra</h2>
+        <div className="flex justify-between items-center p-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold text-white">Nueva Cotización</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
@@ -232,30 +211,88 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
           )}
 
           <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
-              <h3 className="text-sm font-medium text-white">Información Básica</h3>
-              
-              <div>
-                <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
-                  Proveedor *
-                </label>
-                <select
-                  id="supplier_id"
-                  required
-                  value={formData.supplier_id}
-                  onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                  className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+            {/* Customer Selection */}
+            <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-white">Información del Cliente</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerTypeDialog(true)}
+                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
                 >
-                  <option value="">Seleccione un proveedor</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.business_name}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Añadir Nuevo Cliente
+                </button>
               </div>
 
+              <CustomerSelector
+                onSelect={handleCustomerSelect}
+                selectedCustomerId={formData.customer_id}
+              />
+
+              {/* Selected Customer Details */}
+              {selectedCustomer && (
+                <div className="mt-4 grid grid-cols-2 gap-4 bg-gray-900/50 p-4 rounded-lg border border-white/20">
+                  <div className="flex items-start space-x-2">
+                    <Building2 className="h-4 w-4 mt-1 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Razón Social</p>
+                      <p className="font-medium text-white">{selectedCustomer.full_name}</p>
+                      {selectedCustomer.commercial_name && (
+                        <p className="text-sm text-gray-400">{selectedCustomer.commercial_name}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2">
+                    <Mail className="h-4 w-4 mt-1 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Email</p>
+                      <p className="font-medium text-white">{selectedCustomer.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2">
+                    <MapPin className="h-4 w-4 mt-1 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Dirección</p>
+                      <p className="font-medium text-white">{selectedCustomer.address}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2">
+                    <Phone className="h-4 w-4 mt-1 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Teléfono</p>
+                      <p className="font-medium text-white">{selectedCustomer.phone}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-gray-400">Tipo de Comprobante</p>
+                    <p className="font-medium text-white">
+                      {selectedCustomer.invoice_type === 'B01' ? 'Crédito Fiscal (B01)' :
+                       selectedCustomer.invoice_type === 'B02' ? 'Consumo (B02)' :
+                       selectedCustomer.invoice_type === 'B14' ? 'Gubernamental (B14)' :
+                       selectedCustomer.invoice_type === 'B15' ? 'Factura para Exportaciones (B15)' :
+                       'No especificado'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-gray-400">Términos de Pago</p>
+                    <p className="font-medium text-white">
+                      {selectedCustomer.payment_terms === 'contado' ? 'Contado' :
+                       `${selectedCustomer.payment_terms} días`}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Basic Information */}
+            <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
+              <h3 className="text-lg font-medium text-white mb-4">Información de la Cotización</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="issue_date" className="block text-sm font-medium text-gray-300">
@@ -267,39 +304,30 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.issue_date}
                     onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="expected_date" className="block text-sm font-medium text-gray-300">
-                    Fecha Esperada
+                  <label htmlFor="valid_until" className="block text-sm font-medium text-gray-300">
+                    Válida Hasta *
                   </label>
                   <input
                     type="date"
-                    id="expected_date"
-                    value={formData.expected_date}
-                    onChange={(e) => setFormData({ ...formData, expected_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    id="valid_until"
+                    required
+                    value={formData.valid_until}
+                    onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Items */}
-            <div className="bg-gray-800/50 p-4 rounded-lg">
+            <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-sm font-medium text-white">Productos *</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateProductModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Crear Producto
-                  </button>
-                </div>
+                <h3 className="text-lg font-medium text-white">Productos *</h3>
                 <button
                   type="button"
                   onClick={addItem}
@@ -314,25 +342,13 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                 <table className="min-w-full divide-y divide-white/10">
                   <thead>
                     <tr>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">
-                        Producto
-                      </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                        Cantidad
-                      </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                        Precio
-                      </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                        Desc %
-                      </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                        ITBIS
-                      </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
-                        Total
-                      </th>
-                      <th scope="col" className="relative px-3 py-3">
+                      <th className="px-3 py-3.5 text-left text-xs font-medium text-gray-300 uppercase">Producto</th>
+                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Cantidad</th>
+                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Precio</th>
+                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Desc %</th>
+                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">ITBIS</th>
+                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Total</th>
+                      <th className="relative px-3 py-3.5">
                         <span className="sr-only">Acciones</span>
                       </th>
                     </tr>
@@ -345,7 +361,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             value={item.product_id}
                             onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                             required
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                           >
                             <option value="">Seleccione un producto</option>
                             {products.map((product) => (
@@ -362,18 +378,15 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             required
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
                         <td className="px-3 py-4">
                           <input
                             type="number"
-                            min="0"
-                            step="0.01"
                             value={item.unit_price}
-                            onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                            required
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                            readOnly
+                            className="block w-full rounded-md bg-gray-800/50 border-gray-700 text-white shadow-sm sm:text-sm text-right"
                           />
                         </td>
                         <td className="px-3 py-4">
@@ -383,16 +396,16 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             max="100"
                             value={item.discount_rate}
                             onChange={(e) => updateItem(index, 'discount_rate', Number(e.target.value))}
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
-                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
+                        <td className="px-3 py-4 text-right text-gray-300">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
                           }).format(item.tax_amount)}
                         </td>
-                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
+                        <td className="px-3 py-4 text-right text-gray-300">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
@@ -415,7 +428,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
 
               {/* Totals */}
               <div className="mt-4 flex justify-end">
-                <div className="w-64 bg-gray-900/50 p-4 rounded-lg border border-white/10">
+                <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Subtotal:</span>
@@ -461,7 +474,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
             </div>
 
             {/* Notes */}
-            <div className="bg-gray-800/50 p-4 rounded-lg">
+            <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
                 Notas
               </label>
@@ -470,7 +483,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                 placeholder="Notas o comentarios adicionales..."
               />
             </div>
@@ -489,20 +502,33 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
               disabled={loading}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
             >
-              {loading ? 'Guardando...' : 'Crear Orden'}
+              {loading ? 'Guardando...' : 'Crear Cotización'}
             </button>
           </div>
         </form>
-      </div>
 
-      <CreatePurchaseProductModal
-        isOpen={showCreateProductModal}
-        onClose={() => setShowCreateProductModal(false)}
-        onSuccess={() => {
-          setShowCreateProductModal(false);
-          loadProducts();
-        }}
-      />
+        <CustomerTypeDialog
+          isOpen={showCustomerTypeDialog}
+          onClose={() => setShowCustomerTypeDialog(false)}
+          onSelectType={handleCustomerTypeSelect}
+        />
+
+        <CreateCustomerModal
+          isOpen={showCreateCustomerModal}
+          onClose={() => setShowCreateCustomerModal(false)}
+          onSuccess={() => {
+            setShowCreateCustomerModal(false);
+          }}
+        />
+
+        <CreateCorporateCustomerModal
+          isOpen={showCreateCorporateCustomerModal}
+          onClose={() => setShowCreateCorporateCustomerModal(false)}
+          onSuccess={() => {
+            setShowCreateCorporateCustomerModal(false);
+          }}
+        />
+      </div>
     </div>
   );
 }

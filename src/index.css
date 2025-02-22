@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbar but keep functionality */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
 /* Custom table styles */
 @layer components {
   .table-container {
@@ -24,7 +30,7 @@
   /* Glow effect on bottom border */
   .table-row::after {
     content: '';
-    @apply absolute left-0 bottom-0 w-full h-px opacity-0 transition-opacity duration-300
+    @apply absolute left-0 bottom-0 w-full h-px opacity-0 transition-all duration-300
            bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent;
   }
 
@@ -36,6 +42,11 @@
   /* Change glow color to purple on hover */
   .table-row:hover::after {
     @apply bg-gradient-to-r from-transparent via-purple-500/50 to-transparent;
+  }
+
+  /* Add subtle background tint on hover */
+  .table-row:hover {
+    @apply bg-purple-500/5;
   }
 
   .table-cell {
@@ -120,4 +131,96 @@
            hover:bg-red-500/30 focus:ring-red-500
            shadow-[0_0_15px_rgba(239,68,68,0.1)];
   }
+}
+
+/* Custom scrollbar for containers that need it */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-gray-800/50;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-600/50 rounded-full hover:bg-gray-500/50;
+}
+
+/* Card and button animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(-60px);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.1) translateY(0);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.89) translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.animate-slide-up-delay-1 {
+  animation: slideUp 0.5s ease-out 0.1s forwards;
+  opacity: 0;
+}
+
+.animate-slide-up-delay-2 {
+  animation: slideUp 0.5s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+.animate-slide-up-delay-3 {
+  animation: slideUp 0.5s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+.animate-bounce-in-delay-1 {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.1s forwards;
+  opacity: 0;
+}
+
+.animate-bounce-in-delay-2 {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s forwards;
+  opacity: 0;
+}
+
+.animate-bounce-in-delay-3 {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s forwards;
+  opacity: 0;
+}
+
+.animate-bounce-in-delay-4 {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.4s forwards;
+  opacity: 0;
+}
+
+.animate-bounce-in-delay-5 {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.5s forwards;
+  opacity: 0;
 }

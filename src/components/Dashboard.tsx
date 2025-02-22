@@ -1,116 +1,276 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { FileText, Users, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, Package, Beaker, Atom } from 'lucide-react';
+import { 
+  FileText, Users, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, 
+  Package, Beaker, Atom, DollarSign, AlertTriangle, Receipt, ShoppingCart,
+  Building2, CreditCard, Wallet, XCircle
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'Usuario';
+  const [metrics, setMetrics] = useState({
+    monthlyIncome: { total: 0, growthRate: 0 },
+    monthlyExpenses: { total: 0, growthRate: 0 },
+    accountsReceivable: { total: 0, count: 0 },
+    accountsPayable: { total: 0, count: 0 },
+    operatingExpenses: { total: 0, growthRate: 0 },
+    cashBalance: { total: 0, previousTotal: 0 },
+    profitMargin: { current: 0, previous: 0 },
+    averageCollectionPeriod: 0,
+    activeCustomers: 0,
+    overdueInvoices: [] as Array<{
+      id: string;
+      ncf: string;
+      customer_name: string;
+      due_date: string;
+      total_amount: number;
+      days_overdue: number;
+    }>
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadMetrics();
+  }, []);
+
+  const loadMetrics = async () => {
+    try {
+      setError(null);
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+
+      // Get monthly income with growth rate
+      const { data: incomeData, error: incomeError } = await supabase.rpc('get_monthly_income', {
+        p_year: year,
+        p_month: month
+      });
+
+      if (incomeError) throw incomeError;
+
+      // Get invoice payment stats
+      const { data: invoiceStats, error: invoiceError } = await supabase.rpc('get_invoice_payment_stats', {
+        p_year: year,
+        p_month: month
+      });
+
+      if (invoiceError) throw invoiceError;
+
+      // Get active customers count
+      const { count: customersCount, error: customersError } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .eq('status', 'active');
+
+      if (customersError) throw customersError;
+
+      // Get overdue invoices
+      const { data: overdueInvoices, error: overdueError } = await supabase
+        .from('invoices')
+        .select(`
+          id,
+          ncf,
+          customer:customers(full_name),
+          due_date,
+          total_amount
+        `)
+        .eq('status', 'issued')
+        .neq('payment_status', 'paid')
+        .lt('due_date', new Date().toISOString().split('T')[0])
+        .order('due_date', { ascending: true })
+        .limit(5);
+
+      if (overdueError) throw overdueError;
+
+      // Process overdue invoices
+      const processedOverdueInvoices = overdueInvoices?.map(invoice => ({
+        id: invoice.id,
+        ncf: invoice.ncf,
+        customer_name: invoice.customer?.full_name || '',
+        due_date: invoice.due_date,
+        total_amount: invoice.total_amount,
+        days_overdue: Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      })) || [];
+
+      setMetrics({
+        monthlyIncome: {
+          total: incomeData?.total || 0,
+          growthRate: incomeData?.growth_rate || 0
+        },
+        monthlyExpenses: {
+          total: 0,
+          growthRate: 0
+        },
+        accountsReceivable: {
+          total: invoiceStats?.pending?.total || 0,
+          count: invoiceStats?.pending?.count || 0
+        },
+        accountsPayable: {
+          total: 0,
+          count: 0
+        },
+        operatingExpenses: {
+          total: 0,
+          growthRate: 0
+        },
+        cashBalance: {
+          total: 0,
+          previousTotal: 0
+        },
+        profitMargin: {
+          current: 0,
+          previous: 0
+        },
+        averageCollectionPeriod: 30,
+        activeCustomers: customersCount || 0,
+        overdueInvoices: processedOverdueInvoices
+      });
+    } catch (error) {
+      console.error('Error loading metrics:', error);
+      setError(error instanceof Error ? error.message : 'Error al cargar las métricas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickActions = [
+    { to: '/facturacion', icon: FileText, text: 'Crear Factura', color: 'text-emerald-400', delay: 'animate-bounce-in' },
+    { to: '/clientes', icon: Users, text: 'Nuevo Cliente', color: 'text-purple-400', delay: 'animate-bounce-in-delay-1' },
+    { to: '/finanzas', icon: BarChart, text: 'Reporte de Ventas', color: 'text-blue-400', delay: 'animate-bounce-in-delay-2' },
+    { to: '/inventario', icon: Package, text: 'Inventario', color: 'text-yellow-400', delay: 'animate-bounce-in-delay-3' },
+    { to: '/materias-primas', icon: Flask, text: 'Materias Primas', color: 'text-pink-400', delay: 'animate-bounce-in-delay-4' },
+    { to: '/cumplimiento', icon: Beaker, text: 'Control de Calidad', color: 'text-red-400', delay: 'animate-bounce-in-delay-5' }
+  ];
+
+  const secondaryActions = [
+    { to: '/gastos', icon: Receipt, text: 'Gastos', color: 'text-orange-400' },
+    { to: '/compras', icon: ShoppingCart, text: 'Compras', color: 'text-indigo-400' },
+    { to: '/suplidores', icon: Building2, text: 'Suplidores', color: 'text-teal-400' },
+    { to: '/cuentas-por-pagar', icon: CreditCard, text: 'Cuentas por Pagar', color: 'text-rose-400' },
+    { to: '/finanzas', icon: Wallet, text: 'Finanzas', color: 'text-cyan-400' }
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 max-w-lg w-full mx-4 text-center">
+          <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-red-400 mb-2">Error al Cargar Datos</h2>
+          <p className="text-gray-300">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              loadMetrics();
+            }}
+            className="mt-4 px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       {/* Hero Section */}
-      <div className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+      <div className="relative min-h-[40vh] flex items-center justify-center py-8">
         {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
         </div>
 
-        <div className="relative z-10 text-center px-4">
+        <div className="relative z-10 text-center px-4 w-full max-w-6xl mx-auto">
           {/* Logo */}
-          <div className="mb-8 flex justify-center">
+          <div className="mb-6 flex justify-center">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
               <Atom className="w-10 h-10 text-white" />
             </div>
           </div>
 
           {/* Greeting */}
-          <h1 className="text-5xl font-bold mb-4">
+          <h1 className="text-4xl font-bold mb-4">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
               Hola {firstName}
             </span>
           </h1>
-          <p className="text-2xl text-gray-300 mb-12">
+          <p className="text-xl text-gray-300 mb-8">
             ¿En qué vamos a trabajar hoy?
           </p>
 
-          {/* Quick Action Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-            <Link to="/facturacion" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <FileText className="w-8 h-8 text-emerald-400 mb-2" />
-                <span className="text-gray-100 font-medium">Crear Factura</span>
-              </div>
-            </Link>
+          {/* Quick Action Buttons */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mb-8">
+            {quickActions.map((action, index) => (
+              <Link
+                key={action.to}
+                to={action.to}
+                className={`${action.delay} p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 
+                          hover:bg-white/10 transition-all hover:-translate-y-1 group`}
+              >
+                <div className="flex flex-col items-center">
+                  <action.icon className={`w-8 h-8 ${action.color} mb-2 group-hover:scale-110 transition-transform`} />
+                  <span className="text-gray-100 font-medium text-sm text-center">{action.text}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
 
-            <Link to="/clientes" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <Users className="w-8 h-8 text-purple-400 mb-2" />
-                <span className="text-gray-100 font-medium">Nuevo Cliente</span>
-              </div>
-            </Link>
-
-            <Link to="/finanzas" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <BarChart className="w-8 h-8 text-blue-400 mb-2" />
-                <span className="text-gray-100 font-medium">Reporte de Ventas</span>
-              </div>
-            </Link>
-
-            <Link to="/inventario" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <Package className="w-8 h-8 text-yellow-400 mb-2" />
-                <span className="text-gray-100 font-medium">Inventario</span>
-              </div>
-            </Link>
-
-            <Link to="/materias-primas" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <Flask className="w-8 h-8 text-pink-400 mb-2" />
-                <span className="text-gray-100 font-medium">Materias Primas</span>
-              </div>
-            </Link>
-
-            <Link to="/cumplimiento" 
-              className="group p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all">
-              <div className="flex flex-col items-center">
-                <Beaker className="w-8 h-8 text-red-400 mb-2" />
-                <span className="text-gray-100 font-medium">Control de Calidad</span>
-              </div>
-            </Link>
+          {/* Secondary Action Buttons */}
+          <div className="flex flex-wrap justify-center gap-3">
+            {secondaryActions.map((action) => (
+              <Link
+                key={action.to}
+                to={action.to}
+                className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/5 backdrop-blur-sm 
+                         border border-white/10 hover:bg-white/10 transition-all group"
+              >
+                <action.icon className={`w-4 h-4 ${action.color} mr-2 group-hover:scale-110 transition-transform`} />
+                <span className="text-gray-100 text-sm">{action.text}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Dashboard Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Monthly Income */}
-          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
-            <div className="p-5">
+      <div className="container mx-auto px-4 py-6">
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Issued Invoices */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up">
+            <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <FileSpreadsheet className="h-6 w-6 text-green-400" />
+                  <FileText className="h-5 w-5 text-blue-400" />
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Ingresos del Mes
+                      Facturas Emitidas este Mes
                     </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-100">
-                        RD$58,744.00
+                    <dd className="mt-1">
+                      <div className="text-base font-semibold text-blue-400">
+                        {metrics.accountsReceivable.count} facturas
                       </div>
-                      <div className="ml-2 flex items-baseline text-sm font-semibold text-green-400">
-                        <Plus className="self-center flex-shrink-0 h-4 w-4" />
-                        <span className="sr-only">Increased by</span>
-                        12.5%
+                      <div className="text-lg font-semibold text-blue-300">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(metrics.accountsReceivable.total)}
                       </div>
                     </dd>
                   </dl>
@@ -119,20 +279,28 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Active Products */}
-          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
-            <div className="p-5">
+          {/* Paid Invoices */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-1">
+            <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <Package className="h-6 w-6 text-indigo-400" />
+                  <DollarSign className="h-5 w-5 text-emerald-400" />
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Productos Activos
+                      Facturas Cobradas este Mes
                     </dt>
-                    <dd className="text-2xl font-semibold text-gray-100">
-                      143
+                    <dd className="mt-1">
+                      <div className="text-base font-semibold text-emerald-400">
+                        {metrics.accountsReceivable.count} facturas
+                      </div>
+                      <div className="text-lg font-semibold text-emerald-300">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(metrics.accountsReceivable.total)}
+                      </div>
                     </dd>
                   </dl>
                 </div>
@@ -140,24 +308,95 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Active Users */}
-          <div className="bg-gray-800/50 backdrop-blur-sm border border-white/5 overflow-hidden rounded-lg">
-            <div className="p-5">
+          {/* Pending Invoices */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-2">
+            <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <Users className="h-6 w-6 text-orange-400" />
+                  <FileText className="h-5 w-5 text-red-400" />
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-3 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Usuarios Activos
+                      Facturas por Cobrar este Mes
                     </dt>
-                    <dd className="text-2xl font-semibold text-gray-100">
-                      12
+                    <dd className="mt-1">
+                      <div className="text-base font-semibold text-red-400">
+                        {metrics.accountsReceivable.count} facturas
+                      </div>
+                      <div className="text-lg font-semibold text-red-300">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(metrics.accountsReceivable.total)}
+                      </div>
                     </dd>
                   </dl>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Active Customers */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-3">
+            <div className="p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Users className="h-5 w-5 text-purple-400" />
+                </div>
+                <div className="ml-3 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Clientes Activos
+                    </dt>
+                    <dd className="text-lg font-semibold text-white mt-1">
+                      {metrics.activeCustomers}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Alerts Section */}
+        <div className="mt-6">
+          {/* Overdue Invoices */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
+            <div className="p-3 border-b border-white/10">
+              <h3 className="text-base font-medium text-white flex items-center">
+                <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
+                Facturas Vencidas
+              </h3>
+            </div>
+            <div className="p-3 max-h-[200px] overflow-y-auto custom-scrollbar">
+              {metrics.overdueInvoices.length > 0 ? (
+                <div className="space-y-2">
+                  {metrics.overdueInvoices.map((invoice) => (
+                    <div key={invoice.id} className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                      <div>
+                        <p className="text-sm font-medium text-red-300">{invoice.customer_name}</p>
+                        <p className="text-xs text-red-200/70">NCF: {invoice.ncf}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-red-300">
+                          {new Intl.NumberFormat('es-DO', {
+                            style: 'currency',
+                            currency: 'DOP'
+                          }).format(invoice.total_amount)}
+                        </p>
+                        <p className="text-xs text-red-200/70">
+                          {invoice.days_overdue} días vencida
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-center py-3">
+                  No hay facturas vencidas
+                </p>
+              )}
             </div>
           </div>
         </div>

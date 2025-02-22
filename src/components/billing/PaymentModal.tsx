@@ -13,7 +13,7 @@ interface PaymentModalProps {
 export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: PaymentModalProps) {
   const [formData, setFormData] = useState({
     payment_method_id: '',
-    amount: invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0),
+    amount: 0,
     reference_number: '',
     payment_date: new Date().toISOString().split('T')[0],
     notes: '',
@@ -26,8 +26,11 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   useEffect(() => {
     if (isOpen) {
       loadPaymentMethods();
+      // Set initial amount to remaining balance
+      const remainingAmount = invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
+      setFormData(prev => ({ ...prev, amount: remainingAmount }));
     }
-  }, [isOpen]);
+  }, [isOpen, invoice]);
 
   const loadPaymentMethods = async () => {
     try {
@@ -41,7 +44,6 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
       setPaymentMethods(data || []);
     } catch (error) {
       console.error('Error loading payment methods:', error);
-      setError('Error loading payment methods');
     }
   };
 
@@ -51,20 +53,79 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     setError(null);
 
     try {
-      const { error } = await supabase
+      // Start transaction
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user found');
+
+      // Calculate current total paid
+      const currentPaid = invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const newTotal = currentPaid + formData.amount;
+
+      // Check if payment would exceed invoice total
+      if (newTotal > invoice.total_amount) {
+        throw new Error('El monto del pago excede el balance pendiente');
+      }
+
+      // Get cash account ID
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('code', '1100')
+        .single();
+
+      if (accountError) throw accountError;
+      if (!account) throw new Error('No se encontró la cuenta de efectivo');
+
+      // Create payment
+      const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .insert([{
-          ...formData,
           invoice_id: invoice.id,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          payment_method_id: formData.payment_method_id,
+          amount: formData.amount,
+          reference_number: formData.reference_number,
+          payment_date: formData.payment_date,
+          notes: formData.notes,
+          created_by: user.id
+        }])
+        .select()
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      // Update invoice payment status
+      const newStatus = newTotal >= invoice.total_amount ? 'paid' : 'partial';
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ 
+          payment_status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoice.id);
+
+      if (updateError) throw updateError;
+
+      // Create accounting movement
+      const { error: accountingError } = await supabase
+        .from('account_movements')
+        .insert([{
+          account_id: account.id, // Use the actual account UUID
+          date: formData.payment_date,
+          type: 'debit',
+          amount: formData.amount,
+          reference_type: 'payment',
+          reference_id: payment.id,
+          description: `Pago factura ${invoice.ncf}`,
+          created_by: user.id
         }]);
 
-      if (error) throw error;
+      if (accountingError) throw accountingError;
 
       onSuccess();
       onClose();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Error processing payment');
+      console.error('Error processing payment:', error);
+      setError(error instanceof Error ? error.message : 'Error al procesar el pago');
     } finally {
       setLoading(false);
     }
@@ -75,37 +136,44 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   const selectedMethod = paymentMethods.find(m => m.id === formData.payment_method_id);
   const remainingAmount = invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
 
+  // If invoice is fully paid, don't allow more payments
+  if (remainingAmount <= 0) {
+    return (
+      <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+        <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
+          <div className="p-6 text-center">
+            <h3 className="text-lg font-medium text-white mb-4">
+              Factura Pagada
+            </h3>
+            <p className="text-gray-400 mb-6">
+              Esta factura ya ha sido pagada en su totalidad.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
-          {/* Top border */}
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-x-0 top-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Bottom border */}
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-x-0 bottom-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Left border */}
           <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 left-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Right border */}
           <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 right-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Corner glows */}
-          <div className="absolute top-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute bottom-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
         </div>
 
         <div className="flex justify-between items-center p-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white">Registrar Pago</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -160,7 +228,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                 required
                 value={formData.payment_method_id}
                 onChange={(e) => setFormData({ ...formData, payment_method_id: e.target.value })}
-                className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
               >
                 <option value="">Seleccione un método</option>
                 {paymentMethods.map((method) => (
@@ -188,7 +256,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                  className="block w-full pl-10 pr-12 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  className="block w-full pl-10 pr-12 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                   placeholder="0.00"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -212,7 +280,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                     required
                     value={formData.reference_number}
                     onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                    className="block w-full pl-10 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                    className="block w-full pl-10 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     placeholder="Número de confirmación"
                   />
                 </div>
@@ -233,7 +301,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                   required
                   value={formData.payment_date}
                   onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                  className="block w-full pl-10 bg-gray-800 border-gray-700 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  className="block w-full pl-10 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                 />
               </div>
             </div>
@@ -247,7 +315,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                 placeholder="Notas adicionales sobre el pago..."
               />
             </div>
@@ -257,14 +325,14 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-secondary"
+              className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="btn btn-primary"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
             >
               {loading ? 'Procesando...' : 'Registrar Pago'}
             </button>

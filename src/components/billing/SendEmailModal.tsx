@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Send } from 'lucide-react';
 import type { Invoice } from '../../types/billing';
 
@@ -9,9 +9,16 @@ interface SendEmailModalProps {
 }
 
 export default function SendEmailModal({ isOpen, onClose, invoice }: SendEmailModalProps) {
-  const [email, setEmail] = useState(invoice.customer?.email || '');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Set initial email when invoice changes
+    if (invoice?.customer?.email) {
+      setEmail(invoice.customer.email);
+    }
+  }, [invoice]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +37,7 @@ export default function SendEmailModal({ isOpen, onClose, invoice }: SendEmailMo
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !invoice) return null;
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">

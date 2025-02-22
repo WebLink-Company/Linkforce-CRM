@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User, UserCircle2, ChevronRight } from 'lucide-react';
+import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User, UserCircle2, ChevronRight, Building2, ShoppingCart, ListOrdered } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../lib/auth';
 import { useAuth } from '../hooks/useAuth';
@@ -11,6 +11,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [isMenuPinned, setIsMenuPinned] = useState(false);
+  const [showPurchaseSubmenu, setShowPurchaseSubmenu] = useState(false);
+  const [showBillingSubmenu, setShowBillingSubmenu] = useState(false);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -35,15 +37,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Transparent header with glowing effect */}
+      {/* Header */}
       <header className="relative bg-transparent">
-        {/* Glowing background with bright light effect */}
         <div className="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/10 to-transparent"></div>
-          {/* Bright light effect */}
           <div className="absolute inset-0">
-            <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-            <div className="absolute top-0 left-1/3 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-white/20 to-transparent blur-sm"></div>
+            <div className="absolute top-0 left-1/4 w-1/2 h-[3px] bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+            <div className="absolute top-0 left-1/3 w-1/3 h-[4px] bg-gradient-to-r from-transparent via-white/20 to-transparent blur-sm"></div>
             <div className="absolute top-0 left-1/3 -translate-x-1/2 w-32 h-32 bg-emerald-500/20 rounded-full blur-[100px]"></div>
             <div className="absolute top-0 right-1/3 translate-x-1/2 w-32 h-32 bg-blue-500/20 rounded-full blur-[100px]"></div>
           </div>
@@ -65,14 +65,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Floating Dashboard Button */}
           <Link 
             to="/dashboard"
-            className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                     w-12 h-12 bg-gray-800/50 backdrop-blur-sm border border-white/10
+            className="absolute left-1/2 top-[60%] transform -translate-x-1/2 -translate-y-1/2 
+                     w-10 h-10 bg-gray-800/50 backdrop-blur-sm border border-white/10
                      rounded-full flex items-center justify-center 
                      shadow-lg hover:bg-gray-700/50 hover:-translate-y-[calc(50%+2px)]
                      transition-all duration-300 z-10
                      before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-r before:from-emerald-500/20 before:via-blue-500/20 before:to-purple-500/20 before:animate-pulse"
           >
-            <LayoutDashboard className="h-6 w-6 text-white relative z-10" />
+            <LayoutDashboard className="h-5 w-5 text-white relative z-10" />
           </Link>
 
           <div className="flex items-center space-x-4">
@@ -176,10 +176,72 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </li>
               
               <li>
-                <Link to="/facturacion" className={linkClasses('/facturacion')}>
-                  <FileText className="h-5 w-5" />
-                  <span>Facturación</span>
-                </Link>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowBillingSubmenu(!showBillingSubmenu)}
+                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-gray-300 hover:bg-white/5 hover:text-white ${
+                      location.pathname.startsWith('/facturacion') ? 'bg-emerald-500/20 text-emerald-300' : ''
+                    }`}
+                  >
+                    <FileText className="h-5 w-5" />
+                    <span>Facturación</span>
+                    <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${showBillingSubmenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showBillingSubmenu && (
+                    <ul className="ml-6 mt-2 space-y-2">
+                      <li>
+                        <Link to="/facturacion" className={linkClasses('/facturacion')}>
+                          <FileText className="h-4 w-4" />
+                          <span>Facturas</span>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/facturacion/cotizaciones" className={linkClasses('/facturacion/cotizaciones')}>
+                          <FileText className="h-4 w-4" />
+                          <span>Cotizaciones</span>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/facturacion/secuencias" className={linkClasses('/facturacion/secuencias')}>
+                          <ListOrdered className="h-4 w-4" />
+                          <span>Secuencias NCF</span>
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
+                </div>
+              </li>
+
+              {/* Compras Menu */}
+              <li>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPurchaseSubmenu(!showPurchaseSubmenu)}
+                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-gray-300 hover:bg-white/5 hover:text-white ${
+                      location.pathname.startsWith('/compras') ? 'bg-emerald-500/20 text-emerald-300' : ''
+                    }`}
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    <span>Compras</span>
+                    <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${showPurchaseSubmenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showPurchaseSubmenu && (
+                    <ul className="ml-6 mt-2 space-y-2">
+                      <li>
+                        <Link to="/compras" className={linkClasses('/compras')}>
+                          <ShoppingCart className="h-4 w-4" />
+                          <span>Órdenes de Compra</span>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/suplidores" className={linkClasses('/suplidores')}>
+                          <Building2 className="h-4 w-4" />
+                          <span>Suplidores</span>
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
+                </div>
               </li>
               
               <li>

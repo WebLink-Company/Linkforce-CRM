@@ -1,60 +1,56 @@
 import React, { useState } from 'react';
 import { X, Mail, Printer, Building2, Phone, Mail as MailIcon, MapPin, User, Send } from 'lucide-react';
-import type { PurchaseOrder } from '../../types/payables';
+import type { Quote } from '../../types/billing';
 import { supabase } from '../../lib/supabase';
-import EditPurchaseModal from './EditPurchaseModal';
 
-interface PurchaseViewerModalProps {
+interface QuoteViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  purchase: PurchaseOrder | null;
-  onSuccess?: () => void;
+  quote: Quote | null;
 }
 
-export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSuccess }: PurchaseViewerModalProps) {
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [issuing, setIssuing] = useState(false);
+export default function QuoteViewerModal({ isOpen, onClose, quote }: QuoteViewerModalProps) {
+  const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen || !purchase) return null;
+  if (!isOpen || !quote) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleEmail = () => {
-    if (purchase.supplier?.email) {
-      window.location.href = `mailto:${purchase.supplier.email}?subject=Orden de Compra ${purchase.number}`;
+    if (quote.customer?.email) {
+      window.location.href = `mailto:${quote.customer.email}?subject=Cotización ${quote.number}`;
     }
   };
 
-  const handleIssue = async () => {
-    if (!window.confirm('¿Está seguro que desea emitir esta orden de compra? Una vez emitida no podrá modificarla.')) {
+  const handleConvertToInvoice = async () => {
+    if (!window.confirm('¿Está seguro que desea convertir esta cotización en factura?')) {
       return;
     }
 
-    setIssuing(true);
+    setConverting(true);
     setError(null);
 
     try {
-      const { error } = await supabase.rpc('issue_purchase_order', {
-        p_order_id: purchase.id
+      const { error } = await supabase.rpc('convert_quote_to_invoice', {
+        p_quote_id: quote.id
       });
 
       if (error) throw error;
 
-      if (onSuccess) onSuccess();
-      onClose();
+      window.location.reload();
     } catch (error) {
-      console.error('Error issuing purchase order:', error);
-      setError(error instanceof Error ? error.message : 'Error al emitir la orden de compra');
+      console.error('Error converting quote:', error);
+      setError(error instanceof Error ? error.message : 'Error al convertir la cotización');
     } finally {
-      setIssuing(false);
+      setConverting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
@@ -66,16 +62,16 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
 
         {/* Fixed Header */}
         <div className="sticky top-0 flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg z-50">
-          <h2 className="text-lg font-semibold text-white">Orden de Compra #{purchase.number}</h2>
+          <h2 className="text-lg font-semibold text-white">Cotización #{quote.number}</h2>
           <div className="flex items-center space-x-2">
-            {purchase.status === 'draft' && (
+            {quote.status === 'pending' && (
               <button
-                onClick={handleIssue}
-                disabled={issuing}
+                onClick={handleConvertToInvoice}
+                disabled={converting}
                 className="btn btn-primary"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {issuing ? 'Emitiendo...' : 'Emitir Orden'}
+                {converting ? 'Convirtiendo...' : 'Convertir a Factura'}
               </button>
             )}
             <button
@@ -119,74 +115,70 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
               </div>
             </div>
 
-            {/* Order Information */}
+            {/* Quote Information */}
             <div className="text-right">
               <h3 className="text-lg font-semibold text-white mb-2">
-                Orden de Compra
+                Cotización
                 <br />
-                #{purchase.number}
+                #{quote.number}
               </h3>
               <div className="text-sm text-gray-400 space-y-1">
-                <p>Fecha de Emisión: {new Date(purchase.issue_date).toLocaleDateString('es-DO', {
+                <p>Fecha de Emisión: {new Date(quote.issue_date).toLocaleDateString('es-DO', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}</p>
-                {purchase.expected_date && (
-                  <p>Fecha Esperada: {new Date(purchase.expected_date).toLocaleDateString('es-DO', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}</p>
-                )}
+                <p>Válida Hasta: {new Date(quote.valid_until).toLocaleDateString('es-DO', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}</p>
                 <p className="mt-2">
-                  <span className={`status-badge ${
-                    purchase.status === 'draft' ? 'status-badge-warning' :
-                    purchase.status === 'sent' ? 'status-badge-info' :
-                    purchase.status === 'confirmed' ? 'status-badge-success' :
-                    purchase.status === 'received' ? 'status-badge-success' :
-                    'status-badge-error'
+                  <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                    quote.status === 'approved' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
+                    quote.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                    quote.status === 'converted' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                    'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                   }`}>
-                    {purchase.status === 'draft' ? 'Borrador' :
-                     purchase.status === 'sent' ? 'Enviada' :
-                     purchase.status === 'confirmed' ? 'Confirmada' :
-                     purchase.status === 'received' ? 'Recibida' :
-                     'Cancelada'}
+                    {quote.status === 'approved' ? 'Aprobada' :
+                     quote.status === 'rejected' ? 'Rechazada' :
+                     quote.status === 'converted' ? 'Convertida' :
+                     'Pendiente'}
                   </span>
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Supplier Information */}
-          <div className="bg-gray-800/50 p-4 rounded-lg mb-8">
+          {/* Customer Information */}
+          <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10 mb-8">
             <h4 className="text-sm font-medium text-gray-300 mb-4">
-              <Building2 className="h-4 w-4 inline mr-2" />
-              Información del Proveedor
+              <User className="h-4 w-4 inline mr-2" />
+              Información del Cliente
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-400">Razón Social</p>
-                <p className="font-medium text-white">{purchase.supplier?.business_name}</p>
-                {purchase.supplier?.commercial_name && (
-                  <p className="text-sm text-gray-400">{purchase.supplier.commercial_name}</p>
+                <p className="font-medium text-white">{quote.customer?.full_name}</p>
+                {quote.customer?.commercial_name && (
+                  <p className="text-sm text-gray-400">{quote.customer.commercial_name}</p>
                 )}
               </div>
               <div>
                 <p className="text-sm text-gray-400">RNC</p>
-                <p className="font-medium text-white">{purchase.supplier?.tax_id}</p>
+                <p className="font-medium text-white">{quote.customer?.identification_number}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400">Email</p>
-                <p className="font-medium text-white">{purchase.supplier?.email}</p>
+                <p className="font-medium text-white">{quote.customer?.email}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400">Teléfono</p>
-                <p className="font-medium text-white">{purchase.supplier?.phone}</p>
+                <p className="font-medium text-white">{quote.customer?.phone}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm text-gray-400">Dirección</p>
-                <p className="font-medium text-white">{purchase.supplier?.address}</p>
+                <p className="font-medium text-white">{quote.customer?.address}</p>
               </div>
             </div>
           </div>
@@ -217,7 +209,7 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {purchase.items?.map((item, index) => (
+                {quote.items?.map((item, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {item.product?.code}
@@ -254,7 +246,7 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
 
           {/* Totals */}
           <div className="flex justify-end mb-8">
-            <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
+            <div className="w-64">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Subtotal:</span>
@@ -262,7 +254,7 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
                     {new Intl.NumberFormat('es-DO', {
                       style: 'currency',
                       currency: 'DOP'
-                    }).format(purchase.subtotal)}
+                    }).format(quote.subtotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -271,16 +263,18 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
                     {new Intl.NumberFormat('es-DO', {
                       style: 'currency',
                       currency: 'DOP'
-                    }).format(purchase.tax_amount)}
+                    }).format(quote.tax_amount)}
                   </span>
                 </div>
-                {purchase.discount_amount > 0 && (
+                {quote.discount_amount > 0 && (
                   <div className="flex justify-between text-sm text-red-400">
                     <span>Descuento:</span>
-                    <span>-{new Intl.NumberFormat('es-DO', {
-                      style: 'currency',
-                      currency: 'DOP'
-                    }).format(purchase.discount_amount)}</span>
+                    <span>
+                      -{new Intl.NumberFormat('es-DO', {
+                        style: 'currency',
+                        currency: 'DOP'
+                      }).format(quote.discount_amount)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold border-t border-white/10 pt-2">
@@ -289,7 +283,7 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
                     {new Intl.NumberFormat('es-DO', {
                       style: 'currency',
                       currency: 'DOP'
-                    }).format(purchase.total_amount)}
+                    }).format(quote.total_amount)}
                   </span>
                 </div>
               </div>
@@ -297,32 +291,19 @@ export default function PurchaseViewerModal({ isOpen, onClose, purchase, onSucce
           </div>
 
           {/* Notes */}
-          {purchase.notes && (
+          {quote.notes && (
             <div className="mb-8">
               <h4 className="text-sm font-medium text-gray-300 mb-2">Notas:</h4>
-              <p className="text-sm text-gray-400">{purchase.notes}</p>
+              <p className="text-sm text-gray-400">{quote.notes}</p>
             </div>
           )}
 
           {/* Footer */}
           <div className="text-center text-sm text-gray-400 border-t border-white/10 pt-4">
-            <p>Este documento es una orden de compra oficial de Quimicinter S.R.L</p>
+            <p>Esta cotización es válida hasta la fecha indicada y está sujeta a disponibilidad de inventario.</p>
           </div>
         </div>
       </div>
-
-      {showEditModal && (
-        <EditPurchaseModal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => {
-            if (onSuccess) onSuccess();
-            setShowEditModal(false);
-            onClose();
-          }}
-          purchase={purchase}
-        />
-      )}
     </div>
   );
 }

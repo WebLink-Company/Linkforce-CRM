@@ -17,10 +17,16 @@ class FinanceAPI extends BaseAPI {
 
   // Account Management
   async getAccounts() {
-    const { data, error } = await this.query
-      .select('*')
-      .order('code');
-    return { data, error };
+    try {
+      const { data, error } = await this.query
+        .select('*')
+        .eq('is_active', true)
+        .order('code');
+      return { data, error };
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+      return { data: null, error };
+    }
   }
 
   async createAccount(account: Omit<Account, 'id' | 'created_at' | 'updated_at'>) {
