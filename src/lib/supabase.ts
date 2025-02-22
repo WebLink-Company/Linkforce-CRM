@@ -18,6 +18,8 @@ const getCurrentSchema = () => {
   }
   return 'public'; // Default to production
 };
+console.log("Current schema being used:", getCurrentSchema());
+
 
 // Initialize Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
