@@ -27,7 +27,7 @@ export const getCurrentSchema = () => {
     if (hostname.includes('quimicinter')) {
       return 'quimicinter';
     }
-    if (hostname.includes('qalinkforce')) {
+    if (hostname.includes('qa')) {
       return 'qalinkforce';
     }
 
