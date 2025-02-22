@@ -1,15 +1,17 @@
-import { supabase, createSchemaBuilder } from '../supabase';
+import { supabase, getCurrentSchema } from '../supabase';
 
 // Base API class that all other API classes should extend
 export class BaseAPI {
   protected table: string;
+  protected schema: string;
 
   constructor(table: string) {
     this.table = table;
+    this.schema = getCurrentSchema();
   }
 
   protected get query() {
-    return createSchemaBuilder(this.table);
+    return supabase.schema(this.schema).from(this.table);
   }
 
   // Example base methods that use the correct schema

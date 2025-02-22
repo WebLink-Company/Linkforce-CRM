@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { billingAPI } from '../lib/api/billing';
 import { Link } from 'react-router-dom';
 import { 
   FileText, Users, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, 
   Package, Beaker, Atom, DollarSign, AlertTriangle, Receipt, ShoppingCart,
   Building2, CreditCard, Wallet, XCircle
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -40,99 +40,16 @@ export default function Dashboard() {
   const loadMetrics = async () => {
     try {
       setError(null);
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
+      const result = await billingAPI.getDashboardMetrics();
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
-      // Get monthly income with growth rate
-      const { data: incomeData, error: incomeError } = await supabase.rpc('get_monthly_income', {
-        p_year: year,
-        p_month: month
-      });
-
-      if (incomeError) throw incomeError;
-
-      // Get invoice payment stats
-      const { data: invoiceStats, error: invoiceError } = await supabase.rpc('get_invoice_payment_stats', {
-        p_year: year,
-        p_month: month
-      });
-
-      if (invoiceError) throw invoiceError;
-
-      // Get active customers count
-      const { count: customersCount, error: customersError } = await supabase
-        .from('customers')
-        .select('*', { count: 'exact', head: true })
-        .is('deleted_at', null)
-        .eq('status', 'active');
-
-      if (customersError) throw customersError;
-
-      // Get overdue invoices
-      const { data: overdueInvoices, error: overdueError } = await supabase
-        .from('invoices')
-        .select(`
-          id,
-          ncf,
-          customer:customers(full_name),
-          due_date,
-          total_amount
-        `)
-        .eq('status', 'issued')
-        .neq('payment_status', 'paid')
-        .lt('due_date', new Date().toISOString().split('T')[0])
-        .order('due_date', { ascending: true })
-        .limit(5);
-
-      if (overdueError) throw overdueError;
-
-      // Process overdue invoices
-      const processedOverdueInvoices = overdueInvoices?.map(invoice => ({
-        id: invoice.id,
-        ncf: invoice.ncf,
-        customer_name: invoice.customer?.full_name || '',
-        due_date: invoice.due_date,
-        total_amount: invoice.total_amount,
-        days_overdue: Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
-      })) || [];
-
-      setMetrics({
-        monthlyIncome: {
-          total: incomeData?.total || 0,
-          growthRate: incomeData?.growth_rate || 0
-        },
-        monthlyExpenses: {
-          total: 0,
-          growthRate: 0
-        },
-        accountsReceivable: {
-          total: invoiceStats?.pending?.total || 0,
-          count: invoiceStats?.pending?.count || 0
-        },
-        accountsPayable: {
-          total: 0,
-          count: 0
-        },
-        operatingExpenses: {
-          total: 0,
-          growthRate: 0
-        },
-        cashBalance: {
-          total: 0,
-          previousTotal: 0
-        },
-        profitMargin: {
-          current: 0,
-          previous: 0
-        },
-        averageCollectionPeriod: 30,
-        activeCustomers: customersCount || 0,
-        overdueInvoices: processedOverdueInvoices
-      });
+      setMetrics(result.data);
     } catch (error) {
       console.error('Error loading metrics:', error);
-      setError(error instanceof Error ? error.message : 'Error al cargar las métricas');
+      setError(error instanceof Error ? error.message : 'Error loading metrics');
     } finally {
       setLoading(false);
     }
@@ -250,37 +167,8 @@ export default function Dashboard() {
       <div className="container mx-auto px-4 py-6">
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Issued Invoices */}
+          {/* Monthly Income */}
           <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up">
-            <div className="p-4">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FileText className="h-5 w-5 text-blue-400" />
-                </div>
-                <div className="ml-3 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas Emitidas este Mes
-                    </dt>
-                    <dd className="mt-1">
-                      <div className="text-base font-semibold text-blue-400">
-                        {metrics.accountsReceivable.count} facturas
-                      </div>
-                      <div className="text-lg font-semibold text-blue-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(metrics.accountsReceivable.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Paid Invoices */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-1">
             <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -289,17 +177,52 @@ export default function Dashboard() {
                 <div className="ml-3 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas Cobradas este Mes
+                      Ingresos del Mes
                     </dt>
-                    <dd className="mt-1">
-                      <div className="text-base font-semibold text-emerald-400">
-                        {metrics.accountsReceivable.count} facturas
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(metrics.monthlyIncome.total)}
                       </div>
-                      <div className="text-lg font-semibold text-emerald-300">
+                      {metrics.monthlyIncome.growthRate !== 0 && (
+                        <div className={`ml-2 flex items-baseline text-sm font-semibold ${
+                          metrics.monthlyIncome.growthRate > 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          <Plus className="self-center flex-shrink-0 h-4 w-4" />
+                          <span className="sr-only">Increased by</span>
+                          {metrics.monthlyIncome.growthRate.toFixed(1)}%
+                        </div>
+                      )}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Accounts Receivable */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-1">
+            <div className="p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <FileText className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="ml-3 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Cuentas por Cobrar
+                    </dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
                         {new Intl.NumberFormat('es-DO', {
                           style: 'currency',
                           currency: 'DOP'
                         }).format(metrics.accountsReceivable.total)}
+                      </div>
+                      <div className="ml-2 text-sm text-gray-400">
+                        ({metrics.accountsReceivable.count} facturas)
                       </div>
                     </dd>
                   </dl>
@@ -308,27 +231,27 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Pending Invoices */}
+          {/* Accounts Payable */}
           <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-2">
             <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <FileText className="h-5 w-5 text-red-400" />
+                  <CreditCard className="h-5 w-5 text-red-400" />
                 </div>
                 <div className="ml-3 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas por Cobrar este Mes
+                      Cuentas por Pagar
                     </dt>
-                    <dd className="mt-1">
-                      <div className="text-base font-semibold text-red-400">
-                        {metrics.accountsReceivable.count} facturas
-                      </div>
-                      <div className="text-lg font-semibold text-red-300">
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-white">
                         {new Intl.NumberFormat('es-DO', {
                           style: 'currency',
                           currency: 'DOP'
-                        }).format(metrics.accountsReceivable.total)}
+                        }).format(metrics.accountsPayable.total)}
+                      </div>
+                      <div className="ml-2 text-sm text-gray-400">
+                        ({metrics.accountsPayable.count} facturas)
                       </div>
                     </dd>
                   </dl>
@@ -349,7 +272,7 @@ export default function Dashboard() {
                     <dt className="text-sm font-medium text-gray-400 truncate">
                       Clientes Activos
                     </dt>
-                    <dd className="text-lg font-semibold text-white mt-1">
+                    <dd className="text-2xl font-semibold text-white mt-1">
                       {metrics.activeCustomers}
                     </dd>
                   </dl>

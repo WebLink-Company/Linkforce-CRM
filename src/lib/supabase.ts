@@ -8,7 +8,35 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Initialize Supabase client
+// Get current schema based on hostname
+export const getCurrentSchema = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+
+    // Local development handling
+    if (hostname === 'localhost' || hostname.startsWith('127.0.0.1')) {
+      // Check if schema is specified in localStorage for development
+      const devSchema = localStorage.getItem('dev_schema');
+      if (devSchema && ['public', 'quimicinter', 'qalinkforce'].includes(devSchema)) {
+        return devSchema;
+      }
+      return 'public';
+    }
+
+    // Production schema mapping
+    if (hostname.includes('quimicinter')) {
+      return 'quimicinter';
+    }
+    if (hostname.includes('qalinkforce')) {
+      return 'qalinkforce';
+    }
+
+    return 'public';
+  }
+  return 'public';
+};
+
+// Initialize Supabase client with schema header
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -18,24 +46,36 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'x-application-name': 'quimicinter-erp'
+      'x-schema-name': getCurrentSchema()
     }
   }
 });
 
-// Helper function to get current schema
-export const getCurrentSchema = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-
-    if (hostname.includes('qa')) return 'qalinkforce';
-    if (hostname.includes('quimicinter')) return 'quimicinter';
-  }
-  return 'public';
-};
-
-// Helper function to create a query builder with the correct schema
+// Create schema-aware query builder
 export const createSchemaBuilder = (table: string) => {
   const schema = getCurrentSchema();
-  return supabase.from(table).select('*').set({ schema });
+  return supabase.schema(schema).from(table);
+};
+
+// Get schema-specific function name
+export const getSchemaFunction = (funcName: string): string => {
+  const schema = getCurrentSchema();
+  return schema === 'public' ? funcName : `${schema}_${funcName}`;
+};
+
+// Helper to check if schema exists
+export const validateSchema = (schema: string): boolean => {
+  return ['public', 'quimicinter', 'qalinkforce'].includes(schema);
+};
+
+// Development helper to switch schemas
+export const setDevSchema = (schema: string): void => {
+  if (process.env.NODE_ENV === 'development') {
+    if (validateSchema(schema)) {
+      localStorage.setItem('dev_schema', schema);
+      window.location.reload(); // Reload to apply new schema
+    } else {
+      throw new Error(`Invalid schema: ${schema}`);
+    }
+  }
 };

@@ -1,5 +1,5 @@
 import { BaseAPI } from './base';
-import { supabase, createSchemaBuilder } from '../supabase';
+import { supabase, getCurrentSchema, getSchemaFunction } from '../supabase';
 import type { 
   Account,
   AccountMovement,
@@ -172,8 +172,9 @@ class FinanceAPI extends BaseAPI {
         throw new Error('Account not found');
       }
 
+      const funcName = getSchemaFunction('get_account_balance');
       const { data: balanceData, error: balanceError } = await supabase
-        .rpc('get_account_balance', {
+        .rpc(funcName, {
           p_account_id: account.id,
           p_as_of_date: asOfDate
         });
@@ -188,16 +189,18 @@ class FinanceAPI extends BaseAPI {
   }
 
   async getAgedReceivables(asOfDate: string) {
+    const funcName = getSchemaFunction('get_aged_receivables');
     const { data, error } = await supabase
-      .rpc('get_aged_receivables', {
+      .rpc(funcName, {
         p_as_of_date: asOfDate
       });
     return { data, error };
   }
 
   async getCashFlow(startDate: string, endDate: string) {
+    const funcName = getSchemaFunction('get_cash_flow');
     const { data, error } = await supabase
-      .rpc('get_cash_flow', {
+      .rpc(funcName, {
         p_start_date: startDate,
         p_end_date: endDate
       });

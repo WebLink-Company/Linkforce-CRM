@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getSchemaFromHostname } from '../../lib/auth';
+import { getCurrentSchema } from '../../lib/supabase';
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -49,7 +49,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
 
     try {
       // Get current schema
-      const schema = getSchemaFromHostname();
+      const schema = getCurrentSchema();
 
       // Create auth user
       const { data, error: signUpError } = await supabase.auth.signUp({

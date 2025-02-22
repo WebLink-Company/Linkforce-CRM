@@ -1,36 +1,108 @@
 import { supabase } from './supabase';
+import { getCurrentSchema, validateSchema } from './supabase';
 
-export interface LogoutResult {
+interface AuthResult {
   success: boolean;
-  message: string;
-}
-
-export interface AuthError {
-  code: string;
-  message: string;
-}
-
-export interface AuthResult {
-  success: boolean;
-  error?: AuthError;
   data?: any;
+  error?: {
+    code: string;
+    message: string;
+  };
+  message?: string;
 }
 
-// Get the schema name based on hostname
-export const getSchemaFromHostname = (): string => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
+// Login function
+export const login = async (email: string, password: string): Promise<AuthResult> => {
+  try {
+    const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    if (hostname.includes('qa')) return 'qalinkforce';
-    if (hostname.includes('quimicinter')) return 'quimicinter';
+    if (signInError) {
+      throw signInError;
+    }
+
+    if (!session?.user) {
+      throw new Error('No user returned from login');
+    }
+
+    // Validate schema access
+    const schemaResult = await validateSchemaAccess(session.user);
+    if (!schemaResult.success) {
+      await supabase.auth.signOut();
+      return schemaResult;
+    }
+
+    // Update last login
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ 
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', session.user.id);
+
+    if (updateError) {
+      console.error('Error updating last login:', updateError);
+    }
+
+    return {
+      success: true,
+      data: {
+        user: session.user,
+        session
+      }
+    };
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      success: false,
+      error: {
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    };
   }
-  return 'public';
+};
+
+// Logout function
+export const logout = async (): Promise<AuthResult> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: 'Logged out successfully'
+    };
+  } catch (error) {
+    console.error('Logout error:', error);
+    return {
+      success: false,
+      error: {
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error al cerrar sesión'
+      }
+    };
+  }
 };
 
 // Validate user has access to current schema
 export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
   try {
-    const currentSchema = getSchemaFromHostname();
+    const currentSchema = getCurrentSchema();
+    
+    // Validate schema
+    if (!validateSchema(currentSchema)) {
+      return {
+        success: false,
+        error: {
+          code: 'invalid_schema',
+          message: 'Schema inválido'
+        }
+      };
+    }
     
     // Get user profile from current schema
     const { data: profile, error } = await supabase
@@ -91,70 +163,34 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
   }
 };
 
-export const login = async (email: string, password: string): Promise<AuthResult> => {
+// Get current user's profile
+export const getCurrentProfile = async (): Promise<AuthResult> => {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      options: {
-        // Set session persistence to local storage
-        persistSession: true
-      }
-    });
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) throw userError;
+    if (!user) throw new Error('No authenticated user');
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('No user returned from auth');
-
-    // Validate schema access
-    const accessResult = await validateSchemaAccess(authData.user);
-    if (!accessResult.success) {
-      return accessResult;
-    }
-
-    // Update last login
-    await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', authData.user.id);
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-    // Store session in local storage
-    if (authData.session) {
-      localStorage.setItem('supabase.auth.token', authData.session.access_token);
-      localStorage.setItem('supabase.auth.refreshToken', authData.session.refresh_token);
-    }
+    if (profileError) throw profileError;
 
-    return { success: true, data: authData };
+    return {
+      success: true,
+      data: profile
+    };
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Error getting current profile:', error);
     return {
       success: false,
       error: {
-        code: 'auth_error',
-        message: error instanceof Error ? error.message : 'Error durante el inicio de sesión'
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error getting profile'
       }
-    };
-  }
-};
-
-export const logout = async (): Promise<LogoutResult> => {
-  try {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) throw error;
-    
-    // Clear stored tokens
-    localStorage.removeItem('supabase.auth.token');
-    localStorage.removeItem('supabase.auth.refreshToken');
-    
-    return {
-      success: true,
-      message: 'Sesión cerrada exitosamente'
-    };
-  } catch (error) {
-    console.error('Logout error:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Error al cerrar sesión'
     };
   }
 };
