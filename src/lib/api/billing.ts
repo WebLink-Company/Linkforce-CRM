@@ -1,5 +1,5 @@
 import { BaseAPI } from './base';
-import { supabase, getCurrentSchema, getSchemaFunction } from '../supabase';
+import { supabase, getCurrentSchema } from '../supabase';
 import type { Invoice, InvoiceItem } from '../../types/billing';
 
 class BillingAPI extends BaseAPI {
@@ -14,11 +14,13 @@ class BillingAPI extends BaseAPI {
       const month = currentDate.getMonth() + 1;
       const schema = getCurrentSchema();
 
-      // Get monthly income with schema-specific function
+      // Get monthly income using schema-specific function
       const { data: incomeData, error: incomeError } = await supabase
-        .rpc(getSchemaFunction('get_monthly_income'), {
+        .rpc('get_monthly_income', {
           p_year: year,
           p_month: month
+        }, {
+          schema: schema // Specify schema here
         });
 
       if (incomeError) {
@@ -26,11 +28,13 @@ class BillingAPI extends BaseAPI {
         throw incomeError;
       }
 
-      // Get invoice payment stats with schema-specific function
+      // Get invoice payment stats using schema-specific function
       const { data: invoiceStats, error: invoiceError } = await supabase
-        .rpc(getSchemaFunction('get_invoice_payment_stats'), {
+        .rpc('get_invoice_payment_stats', {
           p_year: year,
           p_month: month
+        }, {
+          schema: schema // Specify schema here
         });
 
       if (invoiceError) {
@@ -162,8 +166,10 @@ class BillingAPI extends BaseAPI {
       
       // Get NCF using schema-specific function
       const { data: ncfData, error: ncfError } = await supabase
-        .rpc(getSchemaFunction('generate_ncf'), { 
+        .rpc('generate_ncf', { 
           p_sequence_type: 'B01' 
+        }, {
+          schema: schema // Specify schema here
         });
 
       if (ncfError) throw ncfError;
@@ -208,9 +214,12 @@ class BillingAPI extends BaseAPI {
 
   async issueInvoice(invoiceId: string) {
     try {
+      const schema = getCurrentSchema();
       const { error } = await supabase
-        .rpc(getSchemaFunction('issue_invoice'), {
+        .rpc('issue_invoice', {
           p_invoice_id: invoiceId
+        }, {
+          schema: schema // Specify schema here
         });
 
       if (error) throw error;
@@ -223,10 +232,13 @@ class BillingAPI extends BaseAPI {
 
   async voidInvoice(invoiceId: string, reason: string) {
     try {
+      const schema = getCurrentSchema();
       const { error } = await supabase
-        .rpc(getSchemaFunction('void_invoice'), {
+        .rpc('void_invoice', {
           p_invoice_id: invoiceId,
           p_reason: reason
+        }, {
+          schema: schema // Specify schema here
         });
 
       if (error) throw error;
