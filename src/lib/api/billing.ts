@@ -12,30 +12,37 @@ class BillingAPI extends BaseAPI {
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
+      const schema = getCurrentSchema();
 
-      // Get monthly income using RPC function
-      const { data: incomeData, error: incomeError } = await supabase.rpc('get_monthly_income', {
-        p_year: year,
-        p_month: month
-      });
+      // Get monthly income using schema-specific RPC function
+      const { data: incomeData, error: incomeError } = await supabase.rpc(
+        `${schema}_get_monthly_income`,
+        {
+          p_year: year,
+          p_month: month
+        }
+      );
 
       if (incomeError) {
         console.error('Error getting monthly income:', incomeError);
         throw incomeError;
       }
 
-      // Get invoice payment stats using RPC function
-      const { data: invoiceStats, error: invoiceError } = await supabase.rpc('get_invoice_payment_stats', {
-        p_year: year,
-        p_month: month
-      });
+      // Get invoice payment stats using schema-specific RPC function
+      const { data: invoiceStats, error: invoiceError } = await supabase.rpc(
+        `${schema}_get_invoice_payment_stats`,
+        {
+          p_year: year,
+          p_month: month
+        }
+      );
 
       if (invoiceError) {
         console.error('Error getting invoice stats:', invoiceError);
         throw invoiceError;
       }
 
-      // Get active customers count
+      // Get active customers count from current schema
       const { count: customersCount, error: customersError } = await createSchemaBuilder('customers')
         .select('*', { count: 'exact', head: true })
         .is('deleted_at', null)
@@ -46,7 +53,7 @@ class BillingAPI extends BaseAPI {
         throw customersError;
       }
 
-      // Get overdue invoices
+      // Get overdue invoices from current schema
       const { data: overdueInvoices, error: overdueError } = await createSchemaBuilder('invoices')
         .select(`
           id,
@@ -148,10 +155,15 @@ class BillingAPI extends BaseAPI {
 
   async createInvoice(invoice: Omit<Invoice, 'id' | 'ncf' | 'created_at' | 'updated_at'>, items: Omit<InvoiceItem, 'id' | 'invoice_id'>[]) {
     try {
-      // Get NCF using RPC function
-      const { data: ncfData, error: ncfError } = await supabase.rpc('generate_ncf', {
-        p_sequence_type: 'B01'
-      });
+      const schema = getCurrentSchema();
+      
+      // Get NCF using schema-specific RPC function
+      const { data: ncfData, error: ncfError } = await supabase.rpc(
+        `${schema}_generate_ncf`,
+        {
+          p_sequence_type: 'B01'
+        }
+      );
 
       if (ncfError) throw ncfError;
 
@@ -191,9 +203,13 @@ class BillingAPI extends BaseAPI {
 
   async issueInvoice(invoiceId: string) {
     try {
-      const { error } = await supabase.rpc('issue_invoice', {
-        p_invoice_id: invoiceId
-      });
+      const schema = getCurrentSchema();
+      const { error } = await supabase.rpc(
+        `${schema}_issue_invoice`,
+        {
+          p_invoice_id: invoiceId
+        }
+      );
 
       if (error) throw error;
       return { error: null };
@@ -205,10 +221,14 @@ class BillingAPI extends BaseAPI {
 
   async voidInvoice(invoiceId: string, reason: string) {
     try {
-      const { error } = await supabase.rpc('void_invoice', {
-        p_invoice_id: invoiceId,
-        p_reason: reason
-      });
+      const schema = getCurrentSchema();
+      const { error } = await supabase.rpc(
+        `${schema}_void_invoice`,
+        {
+          p_invoice_id: invoiceId,
+          p_reason: reason
+        }
+      );
 
       if (error) throw error;
       return { error: null };
