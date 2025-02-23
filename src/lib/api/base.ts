@@ -1,4 +1,4 @@
-import { supabase, getCurrentSchema } from '../supabase';
+import { supabase } from '../supabase';
 
 // Base API class that all other API classes should extend
 export class BaseAPI {
@@ -7,11 +7,17 @@ export class BaseAPI {
 
   constructor(table: string) {
     this.table = table;
-    this.schema = getCurrentSchema();
+    this.schema = this.getCurrentSchema();
   }
 
   protected get query() {
     return supabase.schema(this.schema).from(this.table);
+  }
+
+  // Get current schema from supabase client
+  protected getCurrentSchema(): string {
+    const headers = supabase.headers;
+    return headers['x-schema-name'] as string || 'public';
   }
 
   // Example base methods that use the correct schema
@@ -48,5 +54,10 @@ export class BaseAPI {
   async delete(id: string) {
     const { error } = await this.query.delete().eq('id', id);
     return { error };
+  }
+
+  // Helper method to execute RPC functions in the correct schema
+  protected async rpc(functionName: string, params?: Record<string, any>) {
+    return await supabase.rpc(functionName, params);
   }
 }

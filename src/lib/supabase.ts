@@ -17,7 +17,7 @@ export const getCurrentSchema = () => {
     if (hostname === 'localhost' || hostname.startsWith('127.0.0.1')) {
       // Check if schema is specified in localStorage for development
       const devSchema = localStorage.getItem('dev_schema');
-      if (devSchema && ['public', 'quimicinter', 'qa'].includes(devSchema)) {
+      if (devSchema && ['public', 'quimicinter', 'qalinkforce'].includes(devSchema)) {
         return devSchema;
       }
       return 'public';
@@ -35,7 +35,6 @@ export const getCurrentSchema = () => {
   }
   return 'public';
 };
-console.log("Current schema being used:", getCurrentSchema());
 
 // Initialize Supabase client with schema header
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -58,15 +57,15 @@ export const createSchemaBuilder = (table: string) => {
   return supabase.schema(schema).from(table);
 };
 
-// Get schema-specific function name
-export const getSchemaFunction = (funcName: string): string => {
-  const schema = getCurrentSchema();
-  return schema === 'public' ? funcName : `${schema}_${funcName}`;
-};
-
 // Helper to check if schema exists
 export const validateSchema = (schema: string): boolean => {
   return ['public', 'quimicinter', 'qalinkforce'].includes(schema);
+};
+
+// Get schema-specific function name
+export const getSchemaFunction = (functionName: string): string => {
+  const schema = getCurrentSchema();
+  return `${schema}_${functionName}`;
 };
 
 // Development helper to switch schemas

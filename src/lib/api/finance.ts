@@ -172,12 +172,13 @@ class FinanceAPI extends BaseAPI {
         throw new Error('Account not found');
       }
 
-      const funcName = getSchemaFunction('get_account_balance');
-      const { data: balanceData, error: balanceError } = await supabase
-        .rpc(funcName, {
+      const { data: balanceData, error: balanceError } = await supabase.rpc(
+        getSchemaFunction('get_account_balance'),
+        {
           p_account_id: account.id,
           p_as_of_date: asOfDate
-        });
+        }
+      );
 
       if (balanceError) throw balanceError;
 
@@ -189,21 +190,23 @@ class FinanceAPI extends BaseAPI {
   }
 
   async getAgedReceivables(asOfDate: string) {
-    const funcName = getSchemaFunction('get_aged_receivables');
-    const { data, error } = await supabase
-      .rpc(funcName, {
+    const { data, error } = await supabase.rpc(
+      getSchemaFunction('get_aged_receivables'),
+      {
         p_as_of_date: asOfDate
-      });
+      }
+    );
     return { data, error };
   }
 
   async getCashFlow(startDate: string, endDate: string) {
-    const funcName = getSchemaFunction('get_cash_flow');
-    const { data, error } = await supabase
-      .rpc(funcName, {
+    const { data, error } = await supabase.rpc(
+      getSchemaFunction('get_cash_flow'),
+      {
         p_start_date: startDate,
         p_end_date: endDate
-      });
+      }
+    );
     return { data, error };
   }
 }
