@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { LoginForm as ILoginForm, ERRORES_VALIDACION } from '../../types/auth';
 import { login } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentSchema, updateSupabaseSchema } from '../../lib/supabase';
 
 const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -23,11 +24,20 @@ export default function LoginForm() {
     recordar: false,
   });
   
+  const [selectedSchema, setSelectedSchema] = useState(getCurrentSchema());
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [errores, setErrores] = useState<string[]>([]);
   const [cargando, setCargando] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Update Supabase client when schema changes
+    if (selectedSchema) {
+      updateSupabaseSchema(selectedSchema);
+      console.log('Schema updated to:', selectedSchema);
+    }
+  }, [selectedSchema]);
 
   const validarForm = (): boolean => {
     const nuevosErrores: string[] = [];
@@ -94,6 +104,10 @@ export default function LoginForm() {
     }
   };
 
+  const isDev = window.location.hostname === 'localhost' || 
+                window.location.hostname.includes('webcontainer-api.io') || 
+                window.location.hostname.startsWith('127.0.0.1');
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -121,6 +135,28 @@ export default function LoginForm() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Schema Selector for Development */}
+            {isDev && (
+              <div>
+                <label htmlFor="schema" className="block text-sm font-medium text-gray-700">
+                  Schema (Development Only)
+                </label>
+                <select
+                  id="schema"
+                  value={selectedSchema}
+                  onChange={(e) => {
+                    console.log("Changing schema to:", e.target.value);
+                    setSelectedSchema(e.target.value);
+                  }}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                >
+                  <option value="public">Public</option>
+                  <option value="quimicinter">Quimicinter</option>
+                  <option value="qalinkforce">QA Linkforce</option>
+                </select>
               </div>
             )}
 

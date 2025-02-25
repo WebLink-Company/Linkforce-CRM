@@ -8,19 +8,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Get current schema based on hostname
+// Get current schema based on hostname or localStorage in dev mode
 export const getCurrentSchema = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    const isDev = hostname === 'localhost' || 
+                 hostname.includes('webcontainer-api.io') || 
+                 hostname.startsWith('127.0.0.1');
 
-    // Local development handling
-    if (hostname === 'localhost' || hostname.startsWith('127.0.0.1')) {
-      // Check if schema is specified in localStorage for development
+    // Development mode - use localStorage
+    if (isDev) {
       const devSchema = localStorage.getItem('dev_schema');
       if (devSchema && ['public', 'quimicinter', 'qalinkforce'].includes(devSchema)) {
+        console.log('Using development schema:', devSchema);
         return devSchema;
       }
-      return 'public';
     }
 
     // Production schema mapping
@@ -36,46 +38,53 @@ export const getCurrentSchema = () => {
   return 'public';
 };
 
-// Initialize Supabase client with schema header
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: localStorage
-  },
-  global: {
-    headers: {
-      'x-schema-name': getCurrentSchema()
+// Create Supabase client with dynamic schema header
+export const createSupabaseClient = () => {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: localStorage
+    },
+    global: {
+      headers: {
+        'x-schema-name': getCurrentSchema()
+      }
     }
-  }
-});
-
-// Create schema-aware query builder
-export const createSchemaBuilder = (table: string) => {
-  const schema = getCurrentSchema();
-  return supabase.schema(schema).from(table);
+  });
 };
+
+// Export supabase instance
+export const supabase = createSupabaseClient();
 
 // Helper to check if schema exists
 export const validateSchema = (schema: string): boolean => {
   return ['public', 'quimicinter', 'qalinkforce'].includes(schema);
 };
 
-// Get schema-specific function name
+// Get schema-specific function name without duplication
 export const getSchemaFunction = (functionName: string): string => {
   const schema = getCurrentSchema();
-  return `${schema}_${functionName}`;
+  // Remove any existing schema prefix to avoid duplication
+  const baseName = functionName.replace(/^(public|quimicinter|qalinkforce)_/, '');
+  return schema === 'public' ? baseName : `${schema}_${baseName}`;
 };
 
-// Development helper to switch schemas
-export const setDevSchema = (schema: string): void => {
-  if (process.env.NODE_ENV === 'development') {
-    if (validateSchema(schema)) {
-      localStorage.setItem('dev_schema', schema);
-      window.location.reload(); // Reload to apply new schema
-    } else {
-      throw new Error(`Invalid schema: ${schema}`);
-    }
+// Function to recreate Supabase client with new schema
+export const updateSupabaseSchema = (schema: string) => {
+  if (!validateSchema(schema)) {
+    console.error('Invalid schema:', schema);
+    return;
   }
+
+  // Store schema in localStorage for development
+  if (window.location.hostname === 'localhost' || 
+      window.location.hostname.includes('webcontainer-api.io') || 
+      window.location.hostname.startsWith('127.0.0.1')) {
+    localStorage.setItem('dev_schema', schema);
+  }
+
+  // Return new client instance with updated schema
+  return createSupabaseClient();
 };

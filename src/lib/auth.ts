@@ -66,28 +66,6 @@ export const login = async (email: string, password: string): Promise<AuthResult
   }
 };
 
-// Logout function
-export const logout = async (): Promise<AuthResult> => {
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-
-    return {
-      success: true,
-      message: 'Logged out successfully'
-    };
-  } catch (error) {
-    console.error('Logout error:', error);
-    return {
-      success: false,
-      error: {
-        code: error instanceof Error ? error.name : 'unknown',
-        message: error instanceof Error ? error.message : 'Error al cerrar sesión'
-      }
-    };
-  }
-};
-
 // Validate user has access to current schema
 export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
   try {
@@ -115,22 +93,15 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
       throw error;
     }
 
-    // If no profile exists, create one
+    // If no profile exists in this schema, deny access
     if (!profile) {
-      const { error: createError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || '',
-          schema_name: currentSchema,
-          role: user.user_metadata?.role || 'user',
-          status: 'active'
-        }]);
-
-      if (createError) throw createError;
-      
-      return { success: true };
+      return {
+        success: false,
+        error: {
+          code: 'no_profile',
+          message: 'No tienes acceso a este ambiente. Por favor, contacta al administrador.'
+        }
+      };
     }
 
     // Admins can access all schemas
@@ -158,38 +129,6 @@ export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
       error: {
         code: 'validation_error',
         message: 'Error validando acceso'
-      }
-    };
-  }
-};
-
-// Get current user's profile
-export const getCurrentProfile = async (): Promise<AuthResult> => {
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) throw userError;
-    if (!user) throw new Error('No authenticated user');
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) throw profileError;
-
-    return {
-      success: true,
-      data: profile
-    };
-  } catch (error) {
-    console.error('Error getting current profile:', error);
-    return {
-      success: false,
-      error: {
-        code: error instanceof Error ? error.name : 'unknown',
-        message: error instanceof Error ? error.message : 'Error getting profile'
       }
     };
   }
