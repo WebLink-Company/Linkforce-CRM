@@ -20,7 +20,6 @@ export const getCurrentSchema = () => {
     if (isDev) {
       const devSchema = localStorage.getItem('dev_schema');
       if (devSchema && ['public', 'quimicinter', 'qalinkforce'].includes(devSchema)) {
-        console.log('Using development schema:', devSchema);
         return devSchema;
       }
     }
@@ -63,7 +62,7 @@ export const validateSchema = (schema: string): boolean => {
   return ['public', 'quimicinter', 'qalinkforce'].includes(schema);
 };
 
-// Get schema-specific function name without duplication
+// Get schema-specific function name
 export const getSchemaFunction = (functionName: string): string => {
   const schema = getCurrentSchema();
   // Remove any existing schema prefix to avoid duplication

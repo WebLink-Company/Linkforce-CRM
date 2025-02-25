@@ -129,8 +129,6 @@ class BillingAPI extends BaseAPI {
       };
     }
   }
-
-  // ... rest of the class implementation ...
 }
 
 export const billingAPI = new BillingAPI();

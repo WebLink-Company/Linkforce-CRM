@@ -55,23 +55,6 @@ export default function Dashboard() {
     }
   };
 
-  const quickActions = [
-    { to: '/facturacion', icon: FileText, text: 'Crear Factura', color: 'text-emerald-400', delay: 'animate-bounce-in' },
-    { to: '/clientes', icon: Users, text: 'Nuevo Cliente', color: 'text-purple-400', delay: 'animate-bounce-in-delay-1' },
-    { to: '/finanzas', icon: BarChart, text: 'Reporte de Ventas', color: 'text-blue-400', delay: 'animate-bounce-in-delay-2' },
-    { to: '/inventario', icon: Package, text: 'Inventario', color: 'text-yellow-400', delay: 'animate-bounce-in-delay-3' },
-    { to: '/materias-primas', icon: Flask, text: 'Materias Primas', color: 'text-pink-400', delay: 'animate-bounce-in-delay-4' },
-    { to: '/cumplimiento', icon: Beaker, text: 'Control de Calidad', color: 'text-red-400', delay: 'animate-bounce-in-delay-5' }
-  ];
-
-  const secondaryActions = [
-    { to: '/gastos', icon: Receipt, text: 'Gastos', color: 'text-orange-400' },
-    { to: '/compras', icon: ShoppingCart, text: 'Compras', color: 'text-indigo-400' },
-    { to: '/suplidores', icon: Building2, text: 'Suplidores', color: 'text-teal-400' },
-    { to: '/cuentas-por-pagar', icon: CreditCard, text: 'Cuentas por Pagar', color: 'text-rose-400' },
-    { to: '/finanzas', icon: Wallet, text: 'Finanzas', color: 'text-cyan-400' }
-  ];
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
@@ -131,7 +114,14 @@ export default function Dashboard() {
 
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mb-8">
-            {quickActions.map((action, index) => (
+            {[
+              { to: '/facturacion', icon: FileText, text: 'Crear Factura', color: 'text-emerald-400', delay: 'animate-bounce-in' },
+              { to: '/clientes', icon: Users, text: 'Nuevo Cliente', color: 'text-purple-400', delay: 'animate-bounce-in-delay-1' },
+              { to: '/finanzas', icon: BarChart, text: 'Reporte de Ventas', color: 'text-blue-400', delay: 'animate-bounce-in-delay-2' },
+              { to: '/inventario', icon: Package, text: 'Inventario', color: 'text-yellow-400', delay: 'animate-bounce-in-delay-3' },
+              { to: '/materias-primas', icon: Flask, text: 'Materias Primas', color: 'text-pink-400', delay: 'animate-bounce-in-delay-4' },
+              { to: '/cumplimiento', icon: Beaker, text: 'Control de Calidad', color: 'text-red-400', delay: 'animate-bounce-in-delay-5' }
+            ].map((action) => (
               <Link
                 key={action.to}
                 to={action.to}
@@ -148,7 +138,13 @@ export default function Dashboard() {
 
           {/* Secondary Action Buttons */}
           <div className="flex flex-wrap justify-center gap-3">
-            {secondaryActions.map((action) => (
+            {[
+              { to: '/gastos', icon: Receipt, text: 'Gastos', color: 'text-orange-400' },
+              { to: '/compras', icon: ShoppingCart, text: 'Compras', color: 'text-indigo-400' },
+              { to: '/suplidores', icon: Building2, text: 'Suplidores', color: 'text-teal-400' },
+              { to: '/cuentas-por-pagar', icon: CreditCard, text: 'Cuentas por Pagar', color: 'text-rose-400' },
+              { to: '/finanzas', icon: Wallet, text: 'Finanzas', color: 'text-cyan-400' }
+            ].map((action) => (
               <Link
                 key={action.to}
                 to={action.to}
