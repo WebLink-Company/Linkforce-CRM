@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { getCurrentSchema, validateSchema } from './supabase';
 
 interface AuthResult {
   success: boolean;
@@ -27,11 +26,23 @@ export const login = async (email: string, password: string): Promise<AuthResult
       throw new Error('No user returned from login');
     }
 
-    // Validate schema access
-    const schemaResult = await validateSchemaAccess(session.user);
-    if (!schemaResult.success) {
+    // Get profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
       await supabase.auth.signOut();
-      return schemaResult;
+      return {
+        success: false,
+        error: {
+          code: 'profile_error',
+          message: 'Error getting user profile'
+        }
+      };
     }
 
     // Update last login
@@ -88,74 +99,6 @@ export const logout = async (): Promise<AuthResult> => {
   }
 };
 
-// Validate user has access to current schema
-export const validateSchemaAccess = async (user: any): Promise<AuthResult> => {
-  try {
-    const currentSchema = getCurrentSchema();
-    
-    // Validate schema
-    if (!validateSchema(currentSchema)) {
-      return {
-        success: false,
-        error: {
-          code: 'invalid_schema',
-          message: 'Schema inválido'
-        }
-      };
-    }
-    
-    // Get user profile from current schema
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role, schema_name')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (error) {
-      throw error;
-    }
-
-    // If no profile exists in this schema, deny access
-    if (!profile) {
-      return {
-        success: false,
-        error: {
-          code: 'no_profile',
-          message: 'No tienes acceso a este ambiente. Por favor, contacta al administrador.'
-        }
-      };
-    }
-
-    // Admins can access all schemas
-    if (profile.role === 'admin') {
-      return { success: true, data: profile };
-    }
-
-    // Regular users must match schema
-    if (profile.schema_name !== currentSchema) {
-      await supabase.auth.signOut();
-      return {
-        success: false,
-        error: {
-          code: 'schema_mismatch',
-          message: 'No tienes acceso a este ambiente. Por favor, contacta al administrador.'
-        }
-      };
-    }
-
-    return { success: true, data: profile };
-  } catch (error) {
-    console.error('Error validating schema access:', error);
-    return {
-      success: false,
-      error: {
-        code: 'validation_error',
-        message: 'Error validando acceso'
-      }
-    };
-  }
-};
-
 // Get current user's profile
 export const getCurrentProfile = async (): Promise<AuthResult> => {
   try {
@@ -170,7 +113,15 @@ export const getCurrentProfile = async (): Promise<AuthResult> => {
       .eq('id', user.id)
       .single();
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      throw profileError;
+    }
+
+    if (!profile) {
+      console.error('No profile found');
+      throw new Error('Profile not found');
+    }
 
     return {
       success: true,

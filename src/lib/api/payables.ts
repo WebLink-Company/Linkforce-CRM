@@ -1,5 +1,5 @@
 import { BaseAPI } from './base';
-import { supabase, getCurrentSchema, getSchemaFunction } from '../supabase';
+import { supabase } from '../supabase';
 import type {
   Supplier,
   PurchaseOrder,
@@ -19,7 +19,7 @@ class PayablesAPI extends BaseAPI {
   // Expense Categories
   async getExpenseCategories() {
     try {
-      const { data, error } = await createSchemaBuilder('expense_categories')
+      const { data, error } = await this.createSchemaBuilder('expense_categories')
         .select('*')
         .eq('is_active', true)
         .order('name');
@@ -32,10 +32,9 @@ class PayablesAPI extends BaseAPI {
 
   async createExpense(expense: Omit<Expense, 'id' | 'number' | 'created_at' | 'updated_at'>) {
     try {
-      const funcName = getSchemaFunction('generate_expense_number');
-      const { data: number } = await supabase.rpc(funcName);
+      const { data: number } = await this.rpc('generate_expense_number');
       
-      const { data, error } = await createSchemaBuilder('expenses')
+      const { data, error } = await this.createSchemaBuilder('expenses')
         .insert([{ ...expense, number }])
         .select()
         .single();
@@ -49,7 +48,7 @@ class PayablesAPI extends BaseAPI {
 
   async getExpenses() {
     try {
-      const { data, error } = await createSchemaBuilder('expenses')
+      const { data, error } = await this.createSchemaBuilder('expenses')
         .select(`
           *,
           category:expense_categories(*),
@@ -70,8 +69,7 @@ class PayablesAPI extends BaseAPI {
   // Reports
   async getPendingPayables() {
     try {
-      const funcName = getSchemaFunction('get_pending_payables');
-      const { data, error } = await supabase.rpc(funcName);
+      const { data, error } = await this.rpc('get_pending_payables');
       return { data, error };
     } catch (error) {
       console.error('Error loading pending payables:', error);
@@ -81,8 +79,7 @@ class PayablesAPI extends BaseAPI {
 
   async getMonthlyExpensesByCategory(year: number, month: number) {
     try {
-      const funcName = getSchemaFunction('get_monthly_expenses_by_category');
-      const { data, error } = await supabase.rpc(funcName, {
+      const { data, error } = await this.rpc('get_monthly_expenses_by_category', {
         p_year: year,
         p_month: month
       });
@@ -95,8 +92,7 @@ class PayablesAPI extends BaseAPI {
 
   async getExpenseSummary(startDate: string, endDate: string) {
     try {
-      const funcName = getSchemaFunction('get_expense_summary');
-      const { data, error } = await supabase.rpc(funcName, {
+      const { data, error } = await this.rpc('get_expense_summary', {
         p_start_date: startDate,
         p_end_date: endDate
       });
@@ -110,7 +106,7 @@ class PayablesAPI extends BaseAPI {
   // Supplier Management
   async getSuppliers() {
     try {
-      const { data, error } = await createSchemaBuilder('suppliers')
+      const { data, error } = await this.createSchemaBuilder('suppliers')
         .select(`
           *,
           categories:supplier_categories_suppliers(
@@ -138,10 +134,9 @@ class PayablesAPI extends BaseAPI {
   // Purchase Orders
   async createPurchaseOrder(order: Omit<PurchaseOrder, 'id' | 'number' | 'created_at' | 'updated_at'>) {
     try {
-      const funcName = getSchemaFunction('generate_po_number');
-      const { data: number } = await supabase.rpc(funcName);
+      const { data: number } = await this.rpc('generate_po_number');
       
-      const { data, error } = await createSchemaBuilder('purchase_orders')
+      const { data, error } = await this.createSchemaBuilder('purchase_orders')
         .insert([{ ...order, number }])
         .select()
         .single();
@@ -155,7 +150,7 @@ class PayablesAPI extends BaseAPI {
 
   async getPurchaseOrders() {
     try {
-      const { data, error } = await createSchemaBuilder('purchase_orders')
+      const { data, error } = await this.createSchemaBuilder('purchase_orders')
         .select(`
           *,
           supplier:suppliers(*),
@@ -175,7 +170,7 @@ class PayablesAPI extends BaseAPI {
   // Supplier Invoices
   async getSupplierInvoices() {
     try {
-      const { data, error } = await createSchemaBuilder('supplier_invoices')
+      const { data, error } = await this.createSchemaBuilder('supplier_invoices')
         .select(`
           *,
           supplier:suppliers(*),
@@ -202,7 +197,7 @@ class PayablesAPI extends BaseAPI {
     items: any[]
   ) {
     try {
-      const { data: invData, error: invError } = await createSchemaBuilder('supplier_invoices')
+      const { data: invData, error: invError } = await this.createSchemaBuilder('supplier_invoices')
         .insert([invoice])
         .select()
         .single();
@@ -214,7 +209,7 @@ class PayablesAPI extends BaseAPI {
         invoice_id: invData.id
       }));
 
-      const { error: itemsError } = await createSchemaBuilder('supplier_invoice_items')
+      const { error: itemsError } = await this.createSchemaBuilder('supplier_invoice_items')
         .insert(itemsWithInvoiceId);
 
       return { data: invData, error: itemsError };

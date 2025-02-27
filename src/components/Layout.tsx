@@ -38,7 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="relative bg-transparent">
+      <header className="relative bg-transparent z-50">
         <div className="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/10 to-transparent"></div>
           <div className="absolute inset-0">
@@ -129,7 +129,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex">
         {/* Floating Menu Toggle */}
         <div 
-          className={`fixed top-20 left-0 z-50 bg-gray-800/50 backdrop-blur-sm border border-white/10 text-white p-2 rounded-r-lg cursor-pointer transition-transform duration-300 ${
+          className={`fixed top-20 left-0 z-40 bg-gray-800/50 backdrop-blur-sm border border-white/10 text-white p-2 rounded-r-lg cursor-pointer transition-transform duration-300 ${
             isMenuExpanded || isMenuPinned ? 'translate-x-64' : 'translate-x-0 hover:bg-gray-700/50'
           }`}
           onClick={() => setIsMenuPinned(!isMenuPinned)}
@@ -139,7 +139,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Sidebar */}
         <aside 
-          className={`fixed top-12 left-0 h-full w-64 bg-gray-800/50 backdrop-blur-sm border-r border-white/10 transform transition-transform duration-300 z-40 ${
+          className={`fixed top-12 left-0 h-full w-64 bg-gray-800/50 backdrop-blur-sm border-r border-white/10 transform transition-transform duration-300 z-30 ${
             isMenuExpanded || isMenuPinned ? 'translate-x-0' : '-translate-x-full'
           }`}
           onMouseEnter={() => !isMenuPinned && setIsMenuExpanded(true)}
@@ -262,13 +262,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link to="/gastos" className={linkClasses('/gastos')}>
                   <Receipt className="h-5 w-5" />
                   <span>Gastos</span>
-                </Link>
-              </li>
-              
-              <li>
-                <Link to="/cumplimiento" className={linkClasses('/cumplimiento')}>
-                  <BookOpen className="h-5 w-5" />
-                  <span>Cumplimiento</span>
                 </Link>
               </li>
             </ul>

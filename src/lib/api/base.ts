@@ -3,31 +3,24 @@ import { supabase } from '../supabase';
 // Base API class that all other API classes should extend
 export class BaseAPI {
   protected table: string;
-  protected schema: string;
 
   constructor(table: string) {
     this.table = table;
-    this.schema = this.getCurrentSchema();
   }
 
-  protected get query() {
-    return supabase.schema(this.schema).from(this.table);
+  // Create query builder
+  protected createSchemaBuilder(table?: string) {
+    return supabase.from(table || this.table);
   }
 
-  // Get current schema from supabase client
-  protected getCurrentSchema(): string {
-    const headers = supabase.headers;
-    return headers['x-schema-name'] as string || 'public';
-  }
-
-  // Example base methods that use the correct schema
+  // Example base methods
   async findAll() {
-    const { data, error } = await this.query.select('*');
+    const { data, error } = await this.createSchemaBuilder().select('*');
     return { data, error };
   }
 
   async findOne(id: string) {
-    const { data, error } = await this.query
+    const { data, error } = await this.createSchemaBuilder()
       .select('*')
       .eq('id', id)
       .single();
@@ -35,7 +28,7 @@ export class BaseAPI {
   }
 
   async create(data: any) {
-    const { data: result, error } = await this.query
+    const { data: result, error } = await this.createSchemaBuilder()
       .insert([data])
       .select()
       .single();
@@ -43,7 +36,7 @@ export class BaseAPI {
   }
 
   async update(id: string, data: any) {
-    const { data: result, error } = await this.query
+    const { data: result, error } = await this.createSchemaBuilder()
       .update(data)
       .eq('id', id)
       .select()
@@ -52,11 +45,11 @@ export class BaseAPI {
   }
 
   async delete(id: string) {
-    const { error } = await this.query.delete().eq('id', id);
+    const { error } = await this.createSchemaBuilder().delete().eq('id', id);
     return { error };
   }
 
-  // Helper method to execute RPC functions in the correct schema
+  // Helper method to execute RPC functions
   protected async rpc(functionName: string, params?: Record<string, any>) {
     return await supabase.rpc(functionName, params);
   }

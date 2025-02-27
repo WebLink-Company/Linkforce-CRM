@@ -6,9 +6,10 @@ interface AccountSelectorProps {
   value: string;
   onChange: (accountId: string) => void;
   type?: Account['type'][];
+  className?: string;
 }
 
-export default function AccountSelector({ value, onChange, type }: AccountSelectorProps) {
+export default function AccountSelector({ value, onChange, type, className = '' }: AccountSelectorProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +39,7 @@ export default function AccountSelector({ value, onChange, type }: AccountSelect
     return (
       <select
         disabled
-        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+        className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-gray-400 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
       >
         <option>Cargando cuentas...</option>
       </select>
@@ -49,11 +50,11 @@ export default function AccountSelector({ value, onChange, type }: AccountSelect
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+      className={`mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm ${className}`}
     >
       <option value="">Seleccione una cuenta</option>
       {accounts.map((account) => (
-        <option key={account.id} value={account.id}>
+        <option key={account.id} value={account.code}>
           {account.code} - {account.name}
         </option>
       ))}

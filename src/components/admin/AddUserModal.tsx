@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getCurrentSchema } from '../../lib/supabase';
+import type { Usuario } from '../../types/auth';
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -48,9 +48,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     setError(null);
 
     try {
-      // Get current schema
-      const schema = getCurrentSchema();
-
       // Create auth user
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -58,8 +55,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
         options: {
           data: {
             full_name: formData.fullName,
-            role: formData.role,
-            schema_name: schema
+            role: formData.role
           }
         }
       });
@@ -67,7 +63,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
       if (signUpError) throw signUpError;
       if (!data.user) throw new Error('No user data returned');
 
-      // Create profile in current schema
+      // Create profile
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([{
@@ -75,8 +71,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
           email: formData.email,
           full_name: formData.fullName,
           role: formData.role,
-          status: 'active',
-          schema_name: schema
+          status: 'active'
         }]);
 
       if (profileError) {

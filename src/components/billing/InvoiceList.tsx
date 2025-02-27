@@ -47,6 +47,7 @@ export default function InvoiceList() {
     paidInvoices: { count: 0, total: 0 },
     pendingInvoices: { count: 0, total: 0 },
     voidedInvoices: { count: 0, total: 0 },
+    draftInvoices: { count: 0, total: 0 },
     topProducts: [] as { name: string; total: number }[]
   });
   const [sortConfig, setSortConfig] = useState<{
@@ -55,6 +56,7 @@ export default function InvoiceList() {
   } | null>(null);
 
   const itemsPerPage = 30;
+  const currentMonth = new Date().toLocaleString('es-DO', { month: 'long' });
 
   useEffect(() => {
     loadInvoices();
@@ -94,6 +96,10 @@ export default function InvoiceList() {
       const voidedInvoices = monthlyInvoices.filter(inv => inv.status === 'voided');
       const voidedTotal = voidedInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
 
+      // Calculate draft invoices
+      const draftInvoices = monthlyInvoices.filter(inv => inv.status === 'draft');
+      const draftTotal = draftInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+
       // Calculate top products
       const productSales = new Map<string, number>();
       monthlyInvoices.forEach(invoice => {
@@ -114,6 +120,7 @@ export default function InvoiceList() {
         paidInvoices: { count: paidInvoices.length, total: paidTotal },
         pendingInvoices: { count: pendingInvoices.length, total: pendingTotal },
         voidedInvoices: { count: voidedInvoices.length, total: voidedTotal },
+        draftInvoices: { count: draftInvoices.length, total: draftTotal },
         topProducts
       });
     } catch (error) {
@@ -254,8 +261,6 @@ export default function InvoiceList() {
   };
 
   const getFilterDescription = () => {
-    const currentMonth = new Date().toLocaleString('es-DO', { month: 'long' });
-    
     if (dateRange.startDate && dateRange.endDate) {
       return `Facturas del ${new Date(dateRange.startDate).toLocaleDateString()} al ${new Date(dateRange.endDate).toLocaleDateString()}`;
     }
@@ -390,7 +395,7 @@ export default function InvoiceList() {
               Gestione las facturas y pagos del sistema
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none flex flex-wrap gap-3">
             <Link
               to="/facturacion/cotizaciones"
               className="btn btn-secondary"
@@ -432,7 +437,7 @@ export default function InvoiceList() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas del Mes
+                      Facturas de {currentMonth}
                     </dt>
                     <dd className="mt-2">
                       <div className="text-lg font-semibold text-blue-400">
@@ -466,7 +471,7 @@ export default function InvoiceList() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas Cobradas
+                      Facturas Cobradas de {currentMonth}
                     </dt>
                     <dd className="mt-2">
                       <div className="text-lg font-semibold text-emerald-400">
@@ -500,7 +505,7 @@ export default function InvoiceList() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas por Cobrar
+                      Facturas por Cobrar de {currentMonth}
                     </dt>
                     <dd className="mt-2">
                       <div className="text-base font-semibold text-red-400">
@@ -534,11 +539,17 @@ export default function InvoiceList() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Borradores
+                      Borradores de {currentMonth}
                     </dt>
                     <dd className="mt-2">
                       <div className="text-lg font-semibold text-yellow-400">
-                        {invoices.filter(inv => inv.status === 'draft').length} facturas
+                        {stats.draftInvoices.count} facturas
+                      </div>
+                      <div className="text-2xl font-semibold text-yellow-300">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(stats.draftInvoices.total)}
                       </div>
                     </dd>
                   </dl>
@@ -562,7 +573,7 @@ export default function InvoiceList() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-400 truncate">
-                      Anuladas
+                      Anuladas de {currentMonth}
                     </dt>
                     <dd className="mt-2">
                       <div className="text-lg font-semibold text-gray-400">
@@ -594,11 +605,11 @@ export default function InvoiceList() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar facturas..."
-                  className="form-input pl-10"
+                  className="form-input pl-10 w-full"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {/* Date Range Filter */}
               <div className="flex items-center gap-2">
                 <input
@@ -643,122 +654,124 @@ export default function InvoiceList() {
             )}
           </div>
 
-          <div className="table-container">
-            <table className="min-w-full divide-y divide-white/5">
-              <thead className="table-header">
-                <tr>
-                  <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('ncf')}>
-                    <div className="flex items-center space-x-1">
-                      <span>NCF</span>
-                      {getSortIcon('ncf')}
-                    </div>
-                  </th>
-                  <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('customer')}>
-                    <div className="flex items-center space-x-1">
-                      <span>CLIENTE</span>
-                      {getSortIcon('customer')}
-                    </div>
-                  </th>
-                  <th scope="col" className="table-header th">FECHA</th>
-                  <th scope="col" className="table-header th text-right">TOTAL</th>
-                  <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('status')}>
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>ESTADO</span>
-                      {getSortIcon('status')}
-                    </div>
-                  </th>
-                  <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('payment_status')}>
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>ESTADO DE PAGO</span>
-                      {getSortIcon('payment_status')}
-                    </div>
-                  </th>
-                  <th scope="col" className="relative table-header th">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {paginatedInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="table-row">
-                    <td className="table-cell font-medium">{invoice.ncf}</td>
-                    <td className="table-cell">{invoice.customer?.full_name}</td>
-                    <td className="table-cell">
-                      {new Date(invoice.issue_date).toLocaleDateString()}
-                    </td>
-                    <td className="table-cell text-right">
-                      {new Intl.NumberFormat('es-DO', {
-                        style: 'currency',
-                        currency: 'DOP'
-                      }).format(invoice.total_amount)}
-                    </td>
-                    <td className="table-cell text-center">
-                      <span className={`status-badge ${
-                        invoice.status === 'issued' ? 'status-badge-success' :
-                        invoice.status === 'voided' ? 'status-badge-error' :
-                        'status-badge-warning'
-                      }`}>
-                        {invoice.status === 'issued' ? 'Emitida' :
-                         invoice.status === 'voided' ? 'Anulada' : 'Borrador'}
-                      </span>
-                    </td>
-                    <td className="table-cell text-center">
-                      <span className={`status-badge ${
-                        invoice.payment_status === 'paid' ? 'status-badge-success' :
-                        invoice.payment_status === 'partial' ? 'status-badge-warning' :
-                        'status-badge-error'
-                      }`}>
-                        {invoice.payment_status === 'paid' ? 'Pagada' :
-                         invoice.payment_status === 'partial' ? 'Parcial' : 'Pendiente'}
-                      </span>
-                    </td>
-                    <td className="table-cell-action">
-                      <div className="flex justify-end space-x-3">
-                        <button
-                          onClick={() => handleView(invoice)}
-                          className="action-icon-button"
-                          title="Ver detalles"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleEmail(invoice)}
-                          className="action-icon-button"
-                          title="Enviar por email"
-                        >
-                          <Mail className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleExportPDF(invoice)}
-                          className="action-icon-button"
-                          title="Exportar a PDF"
-                        >
-                          <FileDown className="h-5 w-5" />
-                        </button>
-                        {invoice.status === 'draft' && (
-                          <>
-                            <button
-                              onClick={() => handleView(invoice)}
-                              className="action-icon-button"
-                              title="Editar"
-                            >
-                              <Edit className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete( invoice.id)}
-                              className="text-red-400 hover:text-red-300 action-icon-button"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </>
-                        )}
+          <div className="overflow-x-auto">
+            <div className="table-container">
+              <table className="min-w-full divide-y divide-white/5">
+                <thead className="table-header">
+                  <tr>
+                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('ncf')}>
+                      <div className="flex items-center space-x-1">
+                        <span>NCF</span>
+                        {getSortIcon('ncf')}
                       </div>
-                    </td>
+                    </th>
+                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('customer')}>
+                      <div className="flex items-center space-x-1">
+                        <span>CLIENTE</span>
+                        {getSortIcon('customer')}
+                      </div>
+                    </th>
+                    <th scope="col" className="table-header th">FECHA</th>
+                    <th scope="col" className="table-header th text-right">TOTAL</th>
+                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('status')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>ESTADO</span>
+                        {getSortIcon('status')}
+                      </div>
+                    </th>
+                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('payment_status')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>ESTADO DE PAGO</span>
+                        {getSortIcon('payment_status')}
+                      </div>
+                    </th>
+                    <th scope="col" className="relative table-header th">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {paginatedInvoices.map((invoice) => (
+                    <tr key={invoice.id} className="table-row">
+                      <td className="table-cell font-medium">{invoice.ncf}</td>
+                      <td className="table-cell">{invoice.customer?.full_name}</td>
+                      <td className="table-cell">
+                        {new Date(invoice.issue_date).toLocaleDateString()}
+                      </td>
+                      <td className="table-cell text-right">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(invoice.total_amount)}
+                      </td>
+                      <td className="table-cell text-center">
+                        <span className={`status-badge ${
+                          invoice.status === 'issued' ? 'status-badge-success' :
+                          invoice.status === 'voided' ? 'status-badge-error' :
+                          'status-badge-warning'
+                        }`}>
+                          {invoice.status === 'issued' ? 'Emitida' :
+                           invoice.status === 'voided' ? 'Anulada' : 'Borrador'}
+                        </span>
+                      </td>
+                      <td className="table-cell text-center">
+                        <span className={`status-badge ${
+                          invoice.payment_status === 'paid' ? 'status-badge-success' :
+                          invoice.payment_status === 'partial' ? 'status-badge-warning' :
+                          'status-badge-error'
+                        }`}>
+                          {invoice.payment_status === 'paid' ? 'Pagada' :
+                           invoice.payment_status === 'partial' ? 'Parcial' : 'Pendiente'}
+                        </span>
+                      </td>
+                      <td className="table-cell-action">
+                        <div className="flex justify-end space-x-3">
+                          <button
+                            onClick={() => handleView(invoice)}
+                            className="action-icon-button"
+                            title="Ver detalles"
+                          >
+                            <Eye className="h-5 w 5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleEmail(invoice)}
+                            className="action-icon-button"
+                            title="Enviar por email"
+                          >
+                            <Mail className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleExportPDF(invoice)}
+                            className="action-icon-button"
+                            title="Exportar a PDF"
+                          >
+                            <FileDown className="h-5 w-5" />
+                          </button>
+                          {invoice.status === 'draft' && (
+                            <>
+                              <button
+                                onClick={() => handleView(invoice)}
+                                className="action-icon-button"
+                                title="Editar"
+                              >
+                                <Edit className="h-5 w-5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(invoice.id)}
+                                className="text-red-400 hover:text-red-300 action-icon-button"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Pagination */}

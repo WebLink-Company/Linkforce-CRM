@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { User, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { usersAPI } from '../../lib/api/users';
 import type { Usuario } from '../../types/auth';
 import AddUserModal from './AddUserModal';
 import EditUserModal from './EditUserModal';
 import CreateAdminUser from './CreateAdminUser';
+import { getCurrentSchema } from '../../lib/supabase';
 
 export default function UserManagement() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -20,43 +21,25 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      // Get current schema
-      const schema = window.location.hostname.includes('qa') ? 'qalinkforce' :
-                    window.location.hostname.includes('quimicinter') ? 'quimicinter' :
-                    'public';
-
-      // Get current user's role
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user?.id)
-        .single();
-
-      // Query profiles based on role and schema
-      let query = supabase.from('profiles').select('*');
+      const schema = getCurrentSchema();
+      console.log('Loading users for schema:', schema);
       
-      if (currentProfile?.role !== 'admin') {
-        query = query.eq('schema_name', schema);
-      }
+      const { data, error } = await usersAPI.getUsers();
+      if (error) throw error;
 
-      const { data: profiles, error: profilesError } = await query
-        .order('created_at', { ascending: false });
+      // Transform the data to match the Usuario type
+      const transformedUsers = data?.map(user => ({
+        id: user.id,
+        nombre: user.full_name || '',
+        email: user.email || '',
+        rol: user.role || 'user',
+        estado: user.status || 'inactive',
+        ultimaConexion: user.last_login ? new Date(user.last_login) : new Date(),
+        intentosFallidos: 0,
+        ultimoIntentoFallido: undefined
+      })) || [];
 
-      if (profilesError) throw profilesError;
-
-      const formattedUsers = profiles.map(profile => ({
-        id: profile.id,
-        nombre: profile.full_name || '',
-        email: '',
-        rol: profile.role as Usuario['rol'],
-        estado: profile.status === 'active' ? 'activo' : 
-               profile.status === 'inactive' ? 'inactivo' : 'bloqueado',
-        ultimaConexion: profile.last_login ? new Date(profile.last_login) : new Date(),
-        intentosFallidos: 0
-      }));
-
-      setUsuarios(formattedUsers);
+      setUsuarios(transformedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
       setError(error instanceof Error ? error.message : 'Error al cargar los usuarios');
@@ -82,12 +65,8 @@ export default function UserManagement() {
     if (!showConfirmDelete.userId) return;
     
     try {
-      // First delete from auth.users which will trigger our cascade delete
-      const { error: authError } = await supabase.rpc('delete_user', {
-        user_id: showConfirmDelete.userId
-      });
-
-      if (authError) throw authError;
+      const { error } = await usersAPI.deleteUser(showConfirmDelete.userId);
+      if (error) throw error;
       
       await loadUsers();
       setShowConfirmDelete({show: false, userId: null});
@@ -164,11 +143,13 @@ export default function UserManagement() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
                       <span className={`status-badge ${
-                        usuario.estado === 'activo' ? 'status-badge-success' :
-                        usuario.estado === 'bloqueado' ? 'status-badge-error' :
+                        usuario.estado === 'active' ? 'status-badge-success' :
+                        usuario.estado === 'blocked' ? 'status-badge-error' :
                         'status-badge-warning'
                       }`}>
-                        {usuario.estado}
+                        {usuario.estado === 'active' ? 'Activo' :
+                         usuario.estado === 'blocked' ? 'Bloqueado' :
+                         'Inactivo'}
                       </span>
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">

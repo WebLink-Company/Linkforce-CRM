@@ -7,19 +7,15 @@ import {
   Package, Beaker, Atom, DollarSign, AlertTriangle, Receipt, ShoppingCart,
   Building2, CreditCard, Wallet, XCircle
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { getCurrentSchema } from '../lib/supabase';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'Usuario';
   const [metrics, setMetrics] = useState({
     monthlyIncome: { total: 0, growthRate: 0 },
-    monthlyExpenses: { total: 0, growthRate: 0 },
     accountsReceivable: { total: 0, count: 0 },
-    accountsPayable: { total: 0, count: 0 },
-    operatingExpenses: { total: 0, growthRate: 0 },
-    cashBalance: { total: 0, previousTotal: 0 },
-    profitMargin: { current: 0, previous: 0 },
-    averageCollectionPeriod: 0,
     activeCustomers: 0,
     overdueInvoices: [] as Array<{
       id: string;
@@ -34,6 +30,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const schema = getCurrentSchema();
+    console.log("Current Schema:", schema);
     loadMetrics();
   }, []);
 
@@ -54,6 +52,23 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  const quickActions = [
+    { to: '/facturacion', icon: FileText, text: 'Crear Factura', color: 'text-emerald-400', delay: 'animate-bounce-in' },
+    { to: '/clientes', icon: Users, text: 'Nuevo Cliente', color: 'text-purple-400', delay: 'animate-bounce-in-delay-1' },
+    { to: '/finanzas', icon: BarChart, text: 'Reporte de Ventas', color: 'text-blue-400', delay: 'animate-bounce-in-delay-2' },
+    { to: '/inventario', icon: Package, text: 'Inventario', color: 'text-yellow-400', delay: 'animate-bounce-in-delay-3' },
+    { to: '/materias-primas', icon: Flask, text: 'Materias Primas', color: 'text-pink-400', delay: 'animate-bounce-in-delay-4' },
+    { to: '/cumplimiento', icon: Beaker, text: 'Control de Calidad', color: 'text-red-400', delay: 'animate-bounce-in-delay-5' }
+  ];
+
+  const secondaryActions = [
+    { to: '/gastos', icon: Receipt, text: 'Gastos', color: 'text-orange-400' },
+    { to: '/compras', icon: ShoppingCart, text: 'Compras', color: 'text-indigo-400' },
+    { to: '/suplidores', icon: Building2, text: 'Suplidores', color: 'text-teal-400' },
+    { to: '/cuentas-por-pagar', icon: CreditCard, text: 'Cuentas por Pagar', color: 'text-rose-400' },
+    { to: '/finanzas', icon: Wallet, text: 'Finanzas', color: 'text-cyan-400' }
+  ];
 
   if (loading) {
     return (
@@ -114,14 +129,7 @@ export default function Dashboard() {
 
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mb-8">
-            {[
-              { to: '/facturacion', icon: FileText, text: 'Crear Factura', color: 'text-emerald-400', delay: 'animate-bounce-in' },
-              { to: '/clientes', icon: Users, text: 'Nuevo Cliente', color: 'text-purple-400', delay: 'animate-bounce-in-delay-1' },
-              { to: '/finanzas', icon: BarChart, text: 'Reporte de Ventas', color: 'text-blue-400', delay: 'animate-bounce-in-delay-2' },
-              { to: '/inventario', icon: Package, text: 'Inventario', color: 'text-yellow-400', delay: 'animate-bounce-in-delay-3' },
-              { to: '/materias-primas', icon: Flask, text: 'Materias Primas', color: 'text-pink-400', delay: 'animate-bounce-in-delay-4' },
-              { to: '/cumplimiento', icon: Beaker, text: 'Control de Calidad', color: 'text-red-400', delay: 'animate-bounce-in-delay-5' }
-            ].map((action) => (
+            {quickActions.map((action, index) => (
               <Link
                 key={action.to}
                 to={action.to}
@@ -138,13 +146,7 @@ export default function Dashboard() {
 
           {/* Secondary Action Buttons */}
           <div className="flex flex-wrap justify-center gap-3">
-            {[
-              { to: '/gastos', icon: Receipt, text: 'Gastos', color: 'text-orange-400' },
-              { to: '/compras', icon: ShoppingCart, text: 'Compras', color: 'text-indigo-400' },
-              { to: '/suplidores', icon: Building2, text: 'Suplidores', color: 'text-teal-400' },
-              { to: '/cuentas-por-pagar', icon: CreditCard, text: 'Cuentas por Pagar', color: 'text-rose-400' },
-              { to: '/finanzas', icon: Wallet, text: 'Finanzas', color: 'text-cyan-400' }
-            ].map((action) => (
+            {secondaryActions.map((action) => (
               <Link
                 key={action.to}
                 to={action.to}
@@ -227,37 +229,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Accounts Payable */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-2">
-            <div className="p-4">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <CreditCard className="h-5 w-5 text-red-400" />
-                </div>
-                <div className="ml-3 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Cuentas por Pagar
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(metrics.accountsPayable.total)}
-                      </div>
-                      <div className="ml-2 text-sm text-gray-400">
-                        ({metrics.accountsPayable.count} facturas)
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Active Customers */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-3">
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-2">
             <div className="p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -276,20 +249,38 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Alerts Section */}
+          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up-delay-3">
+            <div className="p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      Facturas Vencidas
+                    </dt>
+                    <dd className="text-2xl font-semibold text-white mt-1">
+                      {metrics.overdueInvoices.length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Alerts Section */}
-        <div className="mt-6">
-          {/* Overdue Invoices */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
-            <div className="p-3 border-b border-white/10">
-              <h3 className="text-base font-medium text-white flex items-center">
-                <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
-                Facturas Vencidas
-              </h3>
-            </div>
-            <div className="p-3 max-h-[200px] overflow-y-auto custom-scrollbar">
-              {metrics.overdueInvoices.length > 0 ? (
+        {/* Overdue Invoices */}
+        {metrics.overdueInvoices.length > 0 && (
+          <div className="mt-6">
+            <div className="bg-gray-800/50 shadow rounded-lg border border-white/10">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg font-medium leading-6 text-white mb-4 flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+                  Facturas Vencidas
+                </h3>
                 <div className="space-y-2">
                   {metrics.overdueInvoices.map((invoice) => (
                     <div key={invoice.id} className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg p-2">
@@ -311,14 +302,10 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-gray-400 text-center py-3">
-                  No hay facturas vencidas
-                </p>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

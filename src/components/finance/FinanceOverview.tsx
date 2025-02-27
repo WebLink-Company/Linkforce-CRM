@@ -1,171 +1,115 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { Link } from 'react-router-dom';
-import { DollarSign, BarChart, Plus, FlaskRound as Flask, FileSpreadsheet, Package, Beaker, Atom, Calculator, PieChart, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { financeAPI } from '../../lib/api/finance';
+import { 
+  DollarSign, BarChart, Plus, Wallet, Calculator, ChevronDown, ChevronUp,
+  FilePieChart, FileDown, Printer 
+} from 'lucide-react';
 import AccountSelector from './AccountSelector';
 import AccountMovements from './AccountMovements';
 import PendingReceivables from './PendingReceivables';
 import PendingPayables from './PendingPayables';
-import type { SupplierInvoice } from '../../types/payables';
-import InvoiceViewerModal from '../payables/SupplierInvoiceViewer';
-
-interface FinancialMetrics {
-  monthlyIncome: {
-    total: number;
-    growthRate: number;
-  };
-  monthlyExpenses: {
-    total: number;
-    growthRate: number;
-  };
-  accountsReceivable: {
-    total: number;
-    count: number;
-  };
-  accountsPayable: {
-    total: number;
-    count: number;
-  };
-  operatingExpenses: {
-    total: number;
-    growthRate: number;
-  };
-  cashBalance: {
-    total: number;
-    previousTotal: number;
-  };
-  profitMargin: {
-    current: number;
-    previous: number;
-  };
-  averageCollectionPeriod: number;
-}
+import { exportToCSV } from '../../utils/export';
+import { jsPDF } from 'jspdf';
 
 export default function FinanceOverview() {
   const [selectedAccount, setSelectedAccount] = useState('');
-  const [accountBalance, setAccountBalance] = useState<number | null>(null);
+  const [accountBalances, setAccountBalances] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showReceivables, setShowReceivables] = useState(true);
   const [showPayables, setShowPayables] = useState(true);
-  const [metrics, setMetrics] = useState<FinancialMetrics>({
-    monthlyIncome: { total: 0, growthRate: 0 },
-    monthlyExpenses: { total: 0, growthRate: 0 },
-    accountsReceivable: { total: 0, count: 0 },
-    accountsPayable: { total: 0, count: 0 },
-    operatingExpenses: { total: 0, growthRate: 0 },
-    cashBalance: { total: 0, previousTotal: 0 },
-    profitMargin: { current: 0, previous: 0 },
-    averageCollectionPeriod: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [payables, setPayables] = useState([]);
-  const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
+  // Define main accounts to show balances for
+  const mainAccounts = [
+    { code: '1100', name: 'Efectivo y Equivalentes', icon: Wallet },
+    { code: '1200', name: 'Cuentas por Cobrar', icon: Calculator },
+    { code: '2100', name: 'Cuentas por Pagar', icon: DollarSign },
+    { code: '4000', name: 'Ingresos', icon: BarChart },
+  ];
 
   useEffect(() => {
-    loadFinancialMetrics();
-    loadPayables();
+    loadAccountBalances();
   }, []);
 
-  useEffect(() => {
-    if (selectedAccount) {
-      loadAccountBalance();
-    }
-  }, [selectedAccount]);
-
-  const loadPayables = async () => {
+  const loadAccountBalances = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      const { data, error } = await supabase.rpc('get_pending_payables');
-      if (error) throw error;
-      setPayables(data || []);
+      const balances: Record<string, number> = {};
+      
+      for (const account of mainAccounts) {
+        const { data, error } = await financeAPI.getAccountBalance(
+          account.code,
+          new Date().toISOString().split('T')[0]
+        );
+        
+        if (error) throw error;
+        balances[account.code] = data?.balance || 0;
+      }
+      
+      setAccountBalances(balances);
     } catch (error) {
-      console.error('Error loading payables:', error);
-    }
-  };
-
-  const loadFinancialMetrics = async () => {
-    try {
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      const lastDayOfMonth = new Date(year, month, 0).getDate();
-
-      // Get monthly income
-      const { data: incomeData } = await supabase
-        .rpc('get_monthly_income', { p_year: year, p_month: month });
-
-      // Get monthly expenses from expenses module
-      const { data: expensesData } = await supabase
-        .from('expenses')
-        .select('total_amount, created_at')
-        .eq('status', 'approved')
-        .gte('date', `${year}-${month.toString().padStart(2, '0')}-01`)
-        .lte('date', `${year}-${month.toString().padStart(2, '0')}-${lastDayOfMonth}`);
-
-      const totalExpenses = expensesData?.reduce((sum, expense) => sum + expense.total_amount, 0) || 0;
-
-      // Get accounts receivable
-      const { data: receivablesData } = await supabase
-        .rpc('get_accounts_receivable');
-
-      // Get accounts payable
-      const { data: payablesData } = await supabase
-        .rpc('get_accounts_payable');
-
-      setMetrics({
-        monthlyIncome: {
-          total: incomeData?.total || 0,
-          growthRate: incomeData?.growth_rate || 0
-        },
-        monthlyExpenses: {
-          total: totalExpenses,
-          growthRate: 0 // Calculate this if needed
-        },
-        accountsReceivable: {
-          total: receivablesData?.total || 0,
-          count: receivablesData?.count || 0
-        },
-        accountsPayable: {
-          total: payablesData?.total || 0,
-          count: payablesData?.count || 0
-        },
-        operatingExpenses: {
-          total: totalExpenses,
-          growthRate: 0
-        },
-        cashBalance: {
-          total: 0,
-          previousTotal: 0
-        },
-        profitMargin: {
-          current: 0,
-          previous: 0
-        },
-        averageCollectionPeriod: 30
-      });
-    } catch (error) {
-      console.error('Error loading financial metrics:', error);
+      console.error('Error loading account balances:', error);
+      setError(error instanceof Error ? error.message : 'Error loading account balances');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadAccountBalance = async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_account_balance', {
-        p_account_id: selectedAccount,
-        p_as_of_date: new Date().toISOString().split('T')[0]
-      });
-      if (error) throw error;
-      setAccountBalance(data?.balance || 0);
-    } catch (error) {
-      console.error('Error loading account balance:', error);
-    }
+  const handleExportFinancialReport = () => {
+    // Export to CSV
+    const reportData = mainAccounts.map(account => ({
+      'Cuenta': account.name,
+      'Balance': accountBalances[account.code] || 0
+    }));
+
+    exportToCSV(reportData, 'reporte_financiero');
   };
 
-  const handleViewInvoice = (invoice: SupplierInvoice) => {
-    setSelectedInvoice(invoice);
-    setShowInvoiceModal(true);
+  const handlePrintFinancialReport = () => {
+    const doc = new jsPDF();
+    
+    // Add header
+    doc.setFontSize(20);
+    doc.text('Reporte Financiero', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text('Quimicinter S.R.L', 105, 30, { align: 'center' });
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-DO')}`, 105, 40, { align: 'center' });
+    
+    // Add account balances
+    let y = 60;
+    mainAccounts.forEach(account => {
+      const balance = accountBalances[account.code] || 0;
+      doc.text(account.name, 20, y);
+      doc.text(new Intl.NumberFormat('es-DO', {
+        style: 'currency',
+        currency: 'DOP'
+      }).format(balance), 160, y, { align: 'right' });
+      y += 10;
+    });
+    
+    // Add totals
+    const totalAssets = (accountBalances['1100'] || 0) + (accountBalances['1200'] || 0);
+    const totalLiabilities = accountBalances['2100'] || 0;
+    
+    y += 10;
+    doc.setFontStyle('bold');
+    doc.text('Total Activos:', 20, y);
+    doc.text(new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP'
+    }).format(totalAssets), 160, y, { align: 'right' });
+    
+    y += 10;
+    doc.text('Total Pasivos:', 20, y);
+    doc.text(new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP'
+    }).format(totalLiabilities), 160, y, { align: 'right' });
+    
+    // Save the PDF
+    doc.save('reporte_financiero.pdf');
   };
 
   const formatCurrency = (amount: number) => {
@@ -174,18 +118,6 @@ export default function FinanceOverview() {
       currency: 'DOP'
     }).format(amount);
   };
-
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100">
@@ -197,114 +129,56 @@ export default function FinanceOverview() {
               Gestión financiera y contable de la empresa
             </p>
           </div>
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
+            <button
+              onClick={handleExportFinancialReport}
+              className="btn btn-secondary"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Exportar Reporte
+            </button>
+            <button
+              onClick={handlePrintFinancialReport}
+              className="btn btn-secondary"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir Reporte
+            </button>
+          </div>
         </div>
 
-        {/* Main Metrics Grid */}
+        {/* Account Balance Cards */}
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Ingresos */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DollarSign className="h-6 w-6 text-emerald-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Ingresos del Mes
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {formatCurrency(metrics.monthlyIncome.total)}
-                      </div>
-                      {metrics.monthlyIncome.growthRate !== 0 && (
-                        <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                          metrics.monthlyIncome.growthRate > 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          <Plus className="self-center flex-shrink-0 h-4 w-4" />
-                          <span className="sr-only">Increased by</span>
-                          {metrics.monthlyIncome.growthRate.toFixed(1)}%
-                        </div>
-                      )}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Products */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Package className="h-6 w-6 text-indigo-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Productos Activos
-                    </dt>
-                    <dd className="text-2xl font-semibold text-white">
-                      {metrics.activeProducts}
-                    </dd>
-                  </dl>
+          {mainAccounts.map((account) => {
+            const Icon = account.icon;
+            const balance = accountBalances[account.code] || 0;
+            const isNegative = balance < 0;
+            
+            return (
+              <div key={account.code} 
+                className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10 animate-slide-up"
+              >
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <Icon className="h-6 w-6 text-emerald-400" />
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-400 truncate">
+                          {account.name}
+                        </dt>
+                        <dd className="text-2xl font-semibold text-white">
+                          {formatCurrency(Math.abs(balance))}
+                          {isNegative && <span className="text-red-400 text-sm ml-1">(DR)</span>}
+                        </dd>
+                      </dl>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Cuentas por Cobrar */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Calculator className="h-6 w-6 text-blue-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Cuentas por Cobrar
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {formatCurrency(metrics.accountsReceivable.total)}
-                      </div>
-                      <div className="ml-2 text-sm text-gray-400">
-                        ({metrics.accountsReceivable.count} facturas)
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cuentas por Pagar */}
-          <div className="bg-gray-800/50 overflow-hidden rounded-lg border border-white/10">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Wallet className="h-6 w-6 text-purple-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Cuentas por Pagar
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {formatCurrency(metrics.accountsPayable.total)}
-                      </div>
-                      <div className="ml-2 text-sm text-gray-400">
-                        ({metrics.accountsPayable.count} facturas)
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
 
         {/* Account Selection */}
@@ -327,7 +201,7 @@ export default function FinanceOverview() {
                 <div className="mb-6 bg-gray-900/50 p-4 rounded-lg border border-white/20">
                   <h3 className="text-sm font-medium text-gray-300">Balance Actual</h3>
                   <p className="mt-2 text-2xl font-semibold text-white">
-                    {accountBalance !== null ? formatCurrency(accountBalance) : 'Cargando...'}
+                    {formatCurrency(accountBalances[selectedAccount] || 0)}
                   </p>
                 </div>
 
@@ -376,20 +250,10 @@ export default function FinanceOverview() {
                   <ChevronDown className="h-5 w-5 text-gray-400" />
                 )}
               </button>
-              {showPayables && <PendingPayables payables={payables} onView={handleViewInvoice} />}
+              {showPayables && <PendingPayables />}
             </div>
           </div>
         </div>
-
-        {/* Invoice Viewer Modal */}
-        <InvoiceViewerModal
-          isOpen={showInvoiceModal}
-          onClose={() => {
-            setShowInvoiceModal(false);
-            setSelectedInvoice(null);
-          }}
-          invoice={selectedInvoice}
-        />
       </div>
     </div>
   );
