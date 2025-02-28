@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
+import { X, Plus, Trash2, User, Building2, Phone, Mail as MailIcon, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Customer } from '../../types/customer';
+import CustomerSelector from './CustomerSelector';
+import CustomerTypeDialog from '../customers/CustomerTypeDialog';
 import CreateCustomerModal from '../customers/CreateCustomerModal';
 import CreateCorporateCustomerModal from '../customers/CreateCorporateCustomerModal';
-import CustomerTypeDialog from '../customers/CustomerTypeDialog';
+import AddProductModal from '../inventory/AddProductModal';
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
@@ -12,56 +14,101 @@ interface CreateInvoiceModalProps {
   onSuccess: () => void;
 }
 
+const initialFormState = {
+  issue_date: new Date().toISOString().split('T')[0],
+  due_date: '',
+  notes: '',
+};
+
+const initialItemState = {
+  product_id: '',
+  quantity: 1,
+  unit_price: 0,
+  tax_rate: 18,
+  tax_amount: 0,
+  discount_rate: 0,
+  discount_amount: 0,
+  total_amount: 0
+};
+
 export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoiceModalProps) {
-  const [formData, setFormData] = useState({
-    customer_id: '',
-    issue_date: new Date().toISOString().split('T')[0],
-    due_date: '',
-    notes: '',
-  });
-
-  const [items, setItems] = useState<any[]>([{
-    product_id: '',
-    quantity: 1,
-    unit_price: 0,
-    tax_rate: 18,
-    tax_amount: 0,
-    discount_rate: 0,
-    discount_amount: 0,
-    total_amount: 0
-  }]);
-
+  const [formData, setFormData] = useState(initialFormState);
+  const [items, setItems] = useState<any[]>([{...initialItemState}]);
   const [products, setProducts] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateCorporateCustomerModal, setShowCreateCorporateCustomerModal] = useState(false);
   const [showCustomerTypeDialog, setShowCustomerTypeDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [nextNCF, setNextNCF] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       loadProducts();
-      loadCustomers();
+      checkNextNCF();
     }
   }, [isOpen]);
 
-  const loadCustomers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .is('deleted_at', null)
-        .order('full_name');
+  useEffect(() => {
+    if (selectedCustomer && formData.issue_date) {
+      const issueDate = new Date(formData.issue_date);
+      let daysToAdd = 0;
 
-      if (error) throw error;
-      setCustomers(data || []);
+      if (selectedCustomer.payment_terms === 'contado') {
+        daysToAdd = 0;
+      } else {
+        daysToAdd = parseInt(selectedCustomer.payment_terms, 10) || 0;
+      }
+
+      const dueDate = new Date(issueDate);
+      dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+      setFormData(prev => ({
+        ...prev,
+        due_date: dueDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [selectedCustomer, formData.issue_date]);
+
+  const checkNextNCF = async () => {
+    try {
+      // Get the sequence type from customer or default to B01
+      const sequenceType = selectedCustomer?.invoice_type || 'B01';
+      
+      // Get the next NCF that will be used
+      const { data: sequences, error: seqError } = await supabase
+        .from('fiscal_sequences')
+        .select('prefix, current_number')
+        .eq('sequence_type', sequenceType)
+        .eq('is_active', true)
+        .gte('valid_until', new Date().toISOString().split('T')[0])
+        .single();
+
+      if (seqError) {
+        console.error('Error fetching sequence:', seqError);
+        return;
+      }
+
+      if (sequences) {
+        const nextNumber = sequences.current_number.toString().padStart(8, '0');
+        setNextNCF(`${sequences.prefix}${nextNumber}`);
+      }
     } catch (error) {
-      console.error('Error loading customers:', error);
+      console.error('Error checking next NCF:', error);
+      setError('Error al obtener el próximo NCF');
     }
   };
+
+  // Add this effect to update NCF when customer changes
+  useEffect(() => {
+    if (selectedCustomer) {
+      checkNextNCF();
+    } else {
+      setNextNCF(null);
+    }
+  }, [selectedCustomer]);
 
   const loadProducts = async () => {
     try {
@@ -78,15 +125,32 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
     }
   };
 
+  const resetForm = () => {
+    setFormData(initialFormState);
+    setItems([{...initialItemState}]);
+    setSelectedCustomer(null);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      if (!selectedCustomer) {
+        throw new Error('Debe seleccionar un cliente');
+      }
+
+      if (items.length === 0 || !items[0].product_id) {
+        throw new Error('Debe agregar al menos un producto');
+      }
+
       // Get NCF
       const { data: ncfData, error: ncfError } = await supabase
-        .rpc('generate_ncf', { p_sequence_type: 'B01' });
+        .rpc('generate_ncf', { 
+          p_sequence_type: selectedCustomer.invoice_type || 'B01'
+        });
 
       if (ncfError) throw ncfError;
 
@@ -95,7 +159,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
         .from('invoices')
         .insert([{
           ncf: ncfData,
-          customer_id: formData.customer_id,
+          customer_id: selectedCustomer.id,
           issue_date: formData.issue_date,
           due_date: formData.due_date,
           subtotal: items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0),
@@ -111,6 +175,10 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
         .single();
 
       if (invError) throw invError;
+
+      if (!invData) {
+        throw new Error('Failed to create invoice');
+      }
 
       // Create invoice items
       const invoiceItems = items.map(item => ({
@@ -131,6 +199,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
 
       if (itemsError) throw itemsError;
 
+      // Reset form
+      resetForm();
+      
+      // Get next NCF
+      await checkNextNCF();
+
       onSuccess();
       onClose();
     } catch (error) {
@@ -142,16 +216,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   };
 
   const addItem = () => {
-    setItems([...items, {
-      product_id: '',
-      quantity: 1,
-      unit_price: 0,
-      tax_rate: 18,
-      tax_amount: 0,
-      discount_rate: 0,
-      discount_amount: 0,
-      total_amount: 0
-    }]);
+    setItems([...items, {...initialItemState}]);
   };
 
   const removeItem = (index: number) => {
@@ -169,7 +234,6 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
       }
     }
     
-    // Recalculate totals
     const subtotal = item.quantity * item.unit_price;
     const discount = subtotal * (item.discount_rate / 100);
     const taxable = subtotal - discount;
@@ -185,17 +249,18 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
 
   const handleCustomerTypeSelect = (type: string) => {
     setShowCustomerTypeDialog(false);
-    if (type === 'personal') {
-      setShowCreateCustomerModal(true);
+    if (type === 'individual') {
+      setShowCreateModal(true);
     } else {
       setShowCreateCorporateCustomerModal(true);
     }
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.identification_number.includes(searchTerm)
-  );
+  const handleCustomerCreated = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowCreateModal(false);
+    setShowCreateCorporateCustomerModal(false);
+  };
 
   if (!isOpen) return null;
 
@@ -207,8 +272,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   }), { subtotal: 0, tax_amount: 0, discount_amount: 0, total_amount: 0 });
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 modal-backdrop">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl flex flex-col max-h-[90vh] modal-content">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
@@ -217,22 +282,31 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
           <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
         </div>
 
-        <div className="flex justify-between items-center p-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">Nueva Factura</h2>
+        {/* Fixed Header */}
+        <div className="sticky top-0 flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg z-50">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Nueva Factura</h2>
+            {nextNCF && (
+              <p className="text-sm text-emerald-400 mt-1">
+                Próximo NCF: {nextNCF}
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
-          {error && (
-            <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
-              <p className="text-sm text-red-400">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="p-4 bg-red-500/20 border-b border-red-500/50">
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
 
-          <div className="space-y-6">
-            {/* Customer Selection */}
+        {/* Scrollable Content */}
+        <form onSubmit={handleSubmit} id="invoice-form" className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Customer Information */}
             <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-white">Información del Cliente</h3>
@@ -246,40 +320,11 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                 </button>
               </div>
 
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar cliente por nombre o RNC..."
-                  className="block w-full pl-10 rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
-                />
-              </div>
+              <CustomerSelector
+                onSelect={setSelectedCustomer}
+                selectedCustomerId={selectedCustomer?.id}
+              />
 
-              {searchTerm && (
-                <div className="mt-2 max-h-48 overflow-y-auto rounded-md bg-gray-800/50 border border-white/10">
-                  {filteredCustomers.map((customer) => (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, customer_id: customer.id }));
-                        setSearchTerm(customer.full_name);
-                        setSelectedCustomer(customer);
-                      }}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-700/50 text-sm text-gray-300"
-                    >
-                      <div className="font-medium">{customer.full_name}</div>
-                      <div className="text-xs text-gray-400">RNC: {customer.identification_number}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Selected Customer Details */}
               {selectedCustomer && (
                 <div className="mt-4 grid grid-cols-2 gap-4 bg-gray-900/50 p-4 rounded-lg border border-white/20">
                   <div className="flex items-start space-x-2">
@@ -294,7 +339,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                   </div>
 
                   <div className="flex items-start space-x-2">
-                    <Mail className="h-4 w-4 mt-1 text-gray-400" />
+                    <MailIcon className="h-4 w-4 mt-1 text-gray-400" />
                     <div>
                       <p className="text-xs text-gray-400">Email</p>
                       <p className="font-medium text-white">{selectedCustomer.email}</p>
@@ -331,7 +376,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                   <div>
                     <p className="text-xs text-gray-400">Términos de Pago</p>
                     <p className="font-medium text-white">
-                      {selectedCustomer.payment_terms === 'contado' ? 'Contado' :
+                      {selectedCustomer.payment_terms === 'contado' ? 'Contado' : 
                        `${selectedCustomer.payment_terms} días`}
                     </p>
                   </div>
@@ -339,7 +384,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
               )}
             </div>
 
-            {/* Basic Information */}
+            {/* Invoice Information */}
             <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <h3 className="text-lg font-medium text-white mb-4">Información de la Factura</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -353,7 +398,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                     required
                     value={formData.issue_date}
                     onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
 
@@ -366,38 +411,67 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                     id="due_date"
                     required
                     value={formData.due_date}
-                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                    readOnly
+                    className="mt-1 block w-full rounded-md bg-gray-800/50 border-gray-600/50 text-white shadow-sm cursor-not-allowed sm:text-sm"
                   />
+                  {selectedCustomer && (
+                    <p className="mt-1 text-sm text-gray-400">
+                      {selectedCustomer.payment_terms === 'contado' 
+                        ? 'Pago al contado'
+                        : `Vence a ${selectedCustomer.payment_terms} días`}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Items */}
+            {/* Products */}
             <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-white">Productos *</h3>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Agregar Producto
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateProductModal(true)}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-300 bg-blue-500/20 hover:bg-blue-500/30"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Crear Producto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar Producto
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-white/10">
                   <thead>
                     <tr>
-                      <th className="px-3 py-3.5 text-left text-xs font-medium text-gray-300 uppercase">Producto</th>
-                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Cantidad</th>
-                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Precio</th>
-                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Desc %</th>
-                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">ITBIS</th>
-                      <th className="px-3 py-3.5 text-right text-xs font-medium text-gray-300 uppercase">Total</th>
-                      <th className="relative px-3 py-3.5">
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase w-[45%]">
+                        Producto
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase w-[10%]">
+                        Cantidad
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Precio
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Desc %
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        ITBIS
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Total
+                      </th>
+                      <th scope="col" className="relative px-3 py-3 w-[5%]">
                         <span className="sr-only">Acciones</span>
                       </th>
                     </tr>
@@ -410,7 +484,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                             value={item.product_id}
                             onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                             required
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                           >
                             <option value="">Seleccione un producto</option>
                             {products.map((product) => (
@@ -427,7 +501,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             required
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
                         <td className="px-3 py-4">
@@ -445,16 +519,16 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                             max="100"
                             value={item.discount_rate}
                             onChange={(e) => updateItem(index, 'discount_rate', Number(e.target.value))}
-                            className="block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
-                        <td className="px-3 py-4 text-right text-gray-300">
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
                           }).format(item.tax_amount)}
                         </td>
-                        <td className="px-3 py-4 text-right text-gray-300">
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
@@ -475,7 +549,6 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                 </table>
               </div>
 
-              {/* Totals */}
               <div className="mt-4 flex justify-end">
                 <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
                   <div className="space-y-2">
@@ -532,27 +605,34 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                 placeholder="Notas o comentarios adicionales..."
               />
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
-            >
-              {loading ? 'Guardando...' : 'Crear Factura'}
-            </button>
+          {/* Fixed Footer */}
+          <div className="sticky bottom-0 p-4 border-t border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-b-lg mt-auto">
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  onClose();
+                }}
+                className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="invoice-form"
+                disabled={loading}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
+              >
+                {loading ? 'Guardando...' : 'Crear Factura'}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -563,20 +643,23 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
         />
 
         <CreateCustomerModal
-          isOpen={showCreateCustomerModal}
-          onClose={() => setShowCreateCustomerModal(false)}
-          onSuccess={() => {
-            setShowCreateCustomerModal(false);
-            loadCustomers();
-          }}
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleCustomerCreated}
         />
 
         <CreateCorporateCustomerModal
           isOpen={showCreateCorporateCustomerModal}
           onClose={() => setShowCreateCorporateCustomerModal(false)}
+          onSuccess={handleCustomerCreated}
+        />
+
+        <AddProductModal
+          isOpen={showCreateProductModal}
+          onClose={() => setShowCreateProductModal(false)}
           onSuccess={() => {
-            setShowCreateCorporateCustomerModal(false);
-            loadCustomers();
+            setShowCreateProductModal(false);
+            loadProducts();
           }}
         />
       </div>

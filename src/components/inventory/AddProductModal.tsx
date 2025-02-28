@@ -43,6 +43,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
 
   useEffect(() => {
     if (isOpen) {
+      loadCategories();
       if (editingItem) {
         setFormData({
           code: editingItem.code,
@@ -58,11 +59,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
       } else {
         setFormData(initialFormData);
       }
-      fetchCategories();
     }
   }, [isOpen, editingItem]);
 
-  const fetchCategories = async () => {
+  const loadCategories = async () => {
     try {
       const { data, error } = await supabase
         .from('inventory_categories')
@@ -72,7 +72,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
       if (error) throw error;
       setCategories(data || []);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error loading categories:', error);
     }
   };
 
@@ -93,8 +93,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
 
       if (error) throw error;
 
-      await fetchCategories();
-      setFormData({ ...formData, category_id: data.id });
+      await loadCategories();
+      setFormData(prev => ({ ...prev, category_id: data.id }));
       setShowNewCategoryForm(false);
       setNewCategory({ name: '', description: '' });
     } catch (error) {
@@ -110,32 +110,42 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
     setError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('No authenticated user found');
+      }
+
       const dataToSave = {
         ...formData,
         unit_price: Number(formData.unit_price) || 0,
         min_stock: Number(formData.min_stock) || 0,
         current_stock: Number(formData.current_stock) || 0,
         reorder_point: Number(formData.reorder_point) || 0,
+        status: 'active',
+        created_by: user.id
       };
 
       if (editingItem) {
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('inventory_items')
           .update(dataToSave)
           .eq('id', editingItem.id);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
       } else {
-        const { error } = await supabase
+        const { error: createError } = await supabase
           .from('inventory_items')
           .insert([dataToSave]);
 
-        if (error) throw error;
+        if (createError) throw createError;
       }
 
       onSuccess();
       onClose();
+      setFormData(initialFormData); // Reset form
     } catch (error) {
+      console.error('Error saving product:', error);
       setError(error instanceof Error ? error.message : 'Error saving product');
     } finally {
       setLoading(false);
@@ -146,12 +156,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
-      {/* Glowing Background Effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
-      </div>
-
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-2xl my-8 border border-white/10 shadow-2xl flex flex-col max-h-[90vh]">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
@@ -172,14 +176,14 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {error && (
             <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
               <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="product-form" onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
             <div className="bg-gray-800/50 p-6 rounded-lg border border-white/10">
               <h3 className="text-base font-medium text-white mb-4">Información Básica</h3>
@@ -340,7 +344,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
                       required
                       min="0"
                       step="0.01"
-                      value={formData.unit_price.toString()}
+                      value={formData.unit_price}
                       onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) || 0 })}
                       className="block w-full pl-12 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                       placeholder="0.00"
@@ -363,7 +367,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
                     id="current_stock"
                     required
                     min="0"
-                    value={formData.current_stock.toString()}
+                    value={formData.current_stock}
                     onChange={(e) => setFormData({ ...formData, current_stock: Number(e.target.value) || 0 })}
                     className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
@@ -378,7 +382,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
                     id="min_stock"
                     required
                     min="0"
-                    value={formData.min_stock.toString()}
+                    value={formData.min_stock}
                     onChange={(e) => setFormData({ ...formData, min_stock: Number(e.target.value) || 0 })}
                     className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
@@ -393,7 +397,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
                     id="reorder_point"
                     required
                     min="0"
-                    value={formData.reorder_point.toString()}
+                    value={formData.reorder_point}
                     onChange={(e) => setFormData({ ...formData, reorder_point: Number(e.target.value) || 0 })}
                     className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
@@ -415,6 +419,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess, editingIte
             </button>
             <button
               type="submit"
+              form="product-form"
               disabled={loading}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
             >

@@ -5,16 +5,19 @@ import { supabase } from '../../lib/supabase';
 import PaymentModal from './PaymentModal';
 import PaymentHistory from './PaymentHistory';
 import SendEmailModal from './SendEmailModal';
+import ConfirmationModal from './ConfirmationModal';
 
 interface InvoiceViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   invoice: Invoice | null;
+  onSuccess?: () => void;
 }
 
-export default function InvoiceViewerModal({ isOpen, onClose, invoice }: InvoiceViewerModalProps) {
+export default function InvoiceViewerModal({ isOpen, onClose, invoice, onSuccess }: InvoiceViewerModalProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +32,9 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
   };
 
   const handleIssue = async () => {
-    if (!window.confirm('¿Está seguro que desea emitir esta factura? Una vez emitida no podrá modificarla.')) {
-      return;
-    }
-
+    if (!invoice) return;
+    
+    setShowConfirmation(false);
     setIssuing(true);
     setError(null);
 
@@ -43,7 +45,8 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
 
       if (error) throw error;
 
-      window.location.reload();
+      if (onSuccess) onSuccess();
+      onClose();
     } catch (error) {
       console.error('Error issuing invoice:', error);
       setError(error instanceof Error ? error.message : 'Error al emitir la factura');
@@ -53,46 +56,15 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
-      {/* Glowing Background Effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
-      </div>
-
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
-        {/* Glowing border effects */}
-        <div className="absolute inset-0 rounded-lg pointer-events-none">
-          {/* Top border */}
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-x-0 top-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Bottom border */}
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-x-0 bottom-0 h-[2px] w-3/4 mx-auto bg-gradient-to-r from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Left border */}
-          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 left-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Right border */}
-          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 right-0 w-[2px] h-3/4 my-auto bg-gradient-to-b from-transparent via-white/25 to-transparent blur-sm"></div>
-          
-          {/* Corner glows */}
-          <div className="absolute top-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-          <div className="absolute bottom-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-xl"></div>
-        </div>
-
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 modal-backdrop">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl modal-content">
         {/* Fixed Header */}
-        <div className="flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg">
+        <div className="flex justify-between items-center p-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white">Factura #{invoice.ncf}</h2>
           <div className="flex items-center space-x-2">
             {invoice.status === 'draft' && (
               <button
-                onClick={handleIssue}
+                onClick={() => setShowConfirmation(true)}
                 disabled={issuing}
                 className="btn btn-primary"
               >
@@ -114,10 +86,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </button>
-            <button 
-              onClick={onClose} 
-              className="text-gray-400 hover:text-white transition-colors"
-            >
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -130,7 +99,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
         )}
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="p-6 overflow-y-auto max-h-[calc(100vh-16rem)]">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Left Column - Invoice Details */}
             <div className="md:col-span-2 space-y-6">
@@ -186,7 +155,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
               </div>
 
               {/* Contact Information */}
-              <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-white/10">
+              <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
                 <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center">
                   <User className="h-4 w-4 mr-2" />
                   Información del Cliente
@@ -195,7 +164,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
                   <div className="flex items-start space-x-2">
                     <Building2 className="h-4 w-4 mt-1 text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Razón Social</p>
+                      <p className="text-xs text-gray-400">Razón Social</p>
                       <p className="font-medium text-white">{invoice.customer?.full_name}</p>
                       {invoice.customer?.commercial_name && (
                         <p className="text-sm text-gray-400">{invoice.customer.commercial_name}</p>
@@ -206,7 +175,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
                   <div className="flex items-start space-x-2">
                     <MailIcon className="h-4 w-4 mt-1 text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-xs text-gray-400">Email</p>
                       <p className="font-medium text-white">{invoice.customer?.email}</p>
                     </div>
                   </div>
@@ -214,7 +183,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
                   <div className="flex items-start space-x-2">
                     <MapPin className="h-4 w-4 mt-1 text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Dirección</p>
+                      <p className="text-xs text-gray-400">Dirección</p>
                       <p className="font-medium text-white">{invoice.customer?.address}</p>
                     </div>
                   </div>
@@ -222,7 +191,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
                   <div className="flex items-start space-x-2">
                     <Phone className="h-4 w-4 mt-1 text-gray-400" />
                     <div>
-                      <p className="text-xs text-gray-500">Teléfono</p>
+                      <p className="text-xs text-gray-400">Teléfono</p>
                       <p className="font-medium text-white">{invoice.customer?.phone}</p>
                     </div>
                   </div>
@@ -230,39 +199,55 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
               </div>
 
               {/* Items Table */}
-              <div className="table-container">
-                <table className="min-w-full divide-y divide-white/5">
-                  <thead className="table-header">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10">
+                  <thead className="bg-gray-800/50">
                     <tr>
-                      <th scope="col" className="table-header th">Código</th>
-                      <th scope="col" className="table-header th">Producto</th>
-                      <th scope="col" className="table-header th text-right">Cantidad</th>
-                      <th scope="col" className="table-header th text-right">Precio</th>
-                      <th scope="col" className="table-header th text-right">ITBIS</th>
-                      <th scope="col" className="table-header th text-right">Total</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                        Código
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                        Producto
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Cantidad
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Precio
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        ITBIS
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Total
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-white/10">
                     {invoice.items?.map((item, index) => (
-                      <tr key={index} className="table-row">
-                        <td className="table-cell font-medium">{item.product?.code}</td>
-                        <td className="table-cell">{item.product?.name}</td>
-                        <td className="table-cell text-right">
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {item.product?.code}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-300">
+                          {item.product?.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">
                           {item.quantity} {item.product?.unit_measure}
                         </td>
-                        <td className="table-cell text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
                           }).format(item.unit_price)}
                         </td>
-                        <td className="table-cell text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
                           }).format(item.tax_amount)}
                         </td>
-                        <td className="table-cell text-right font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
@@ -276,7 +261,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
 
               {/* Totals */}
               <div className="flex justify-end">
-                <div className="w-64 bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-white/10">
+                <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Subtotal:</span>
@@ -325,7 +310,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
             {invoice.status === 'issued' && (
               <div className="space-y-6">
                 {/* Payment Status */}
-                <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-white/10">
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
                   <h3 className="text-sm font-medium text-gray-300 mb-4">Estado de Pago</h3>
                   <div className="space-y-4">
                     <div>
@@ -373,7 +358,7 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
 
                 {/* Payment History */}
                 {invoice.payments && invoice.payments.length > 0 && (
-                  <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg border border-white/10">
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
                     <h3 className="text-sm font-medium text-gray-300 mb-4">Historial de Pagos</h3>
                     <PaymentHistory payments={invoice.payments} />
                   </div>
@@ -390,23 +375,32 @@ export default function InvoiceViewerModal({ isOpen, onClose, invoice }: Invoice
             </div>
           )}
         </div>
+
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            if (onSuccess) onSuccess();
+          }}
+          invoice={invoice}
+        />
+
+        <SendEmailModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          invoice={invoice}
+        />
+
+        <ConfirmationModal
+          isOpen={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          onConfirm={handleIssue}
+          title="Confirmar Emisión"
+          message="¿Está seguro que desea emitir esta factura? Una vez emitida no podrá modificarla."
+          loading={issuing}
+        />
       </div>
-
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSuccess={() => {
-          setShowPaymentModal(false);
-          window.location.reload();
-        }}
-        invoice={invoice}
-      />
-
-      <SendEmailModal
-        isOpen={showEmailModal}
-        onClose={() => setShowEmailModal(false)}
-        invoice={invoice}
-      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { billingAPI } from '../../lib/api/billing';
 import type { Invoice } from '../../types/billing';
 import CreateInvoiceModal from './CreateInvoiceModal';
 import InvoiceViewerModal from './InvoiceViewerModal';
+import EditInvoiceModal from './EditInvoiceModal';
 import SendEmailModal from './SendEmailModal';
 import { exportToCSV } from '../../utils/export';
 import { Link } from 'react-router-dom';
@@ -33,6 +34,7 @@ export default function InvoiceList() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewerModal, setShowViewerModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
@@ -53,7 +55,7 @@ export default function InvoiceList() {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: 'asc' | 'desc';
-  } | null>(null);
+  }>({ key: 'status', direction: 'asc' });
 
   const itemsPerPage = 30;
   const currentMonth = new Date().toLocaleString('es-DO', { month: 'long' });
@@ -143,8 +145,13 @@ export default function InvoiceList() {
         );
       }
       
-      // Apply active filter
-      if (activeFilter) {
+      // By default show only issued and draft invoices
+      if (!activeFilter) {
+        filteredData = filteredData.filter(inv => 
+          inv.status === 'issued' || inv.status === 'draft'
+        );
+      } else {
+        // Apply active filter
         switch (activeFilter) {
           case 'month':
             const now = new Date();
@@ -180,25 +187,14 @@ export default function InvoiceList() {
             // No additional filtering needed
             break;
         }
-      } else {
-        // Default to showing only issued invoices
-        filteredData = filteredData.filter(inv => inv.status === 'issued');
       }
 
-      // Sort invoices
-      const sortedInvoices = filteredData.sort((a, b) => {
-        if (sortConfig !== null) {
+      // Apply sorting
+      if (sortConfig) {
+        filteredData.sort((a, b) => {
           let aValue, bValue;
           
           switch (sortConfig.key) {
-            case 'ncf':
-              aValue = a.ncf;
-              bValue = b.ncf;
-              break;
-            case 'customer':
-              aValue = a.customer?.full_name || '';
-              bValue = b.customer?.full_name || '';
-              break;
             case 'status':
               aValue = STATUS_ORDER[a.status as keyof typeof STATUS_ORDER];
               bValue = STATUS_ORDER[b.status as keyof typeof STATUS_ORDER];
@@ -207,24 +203,26 @@ export default function InvoiceList() {
               aValue = PAYMENT_STATUS_ORDER[a.payment_status as keyof typeof PAYMENT_STATUS_ORDER];
               bValue = PAYMENT_STATUS_ORDER[b.payment_status as keyof typeof PAYMENT_STATUS_ORDER];
               break;
+            case 'customer':
+              aValue = a.customer?.full_name || '';
+              bValue = b.customer?.full_name || '';
+              break;
+            case 'ncf':
+              aValue = a.ncf;
+              bValue = b.ncf;
+              break;
             default:
-              return 0;
+              aValue = a[sortConfig.key as keyof Invoice];
+              bValue = b[sortConfig.key as keyof Invoice];
           }
 
-          if (aValue < bValue) {
-            return sortConfig.direction === 'asc' ? -1 : 1;
-          }
-          if (aValue > bValue) {
-            return sortConfig.direction === 'asc' ? 1 : -1;
-          }
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
-        }
+        });
+      }
 
-        // Default sort by date descending
-        return new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime();
-      });
-      
-      setInvoices(sortedInvoices);
+      setInvoices(filteredData);
     } catch (error) {
       console.error('Error loading invoices:', error);
     } finally {
@@ -336,6 +334,11 @@ export default function InvoiceList() {
     setShowViewerModal(true);
   };
 
+  const handleEdit = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowEditModal(true);
+  };
+
   const handleEmail = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setShowEmailModal(true);
@@ -395,7 +398,7 @@ export default function InvoiceList() {
               Gestione las facturas y pagos del sistema
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none flex flex-wrap gap-3">
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex space-x-3">
             <Link
               to="/facturacion/cotizaciones"
               className="btn btn-secondary"
@@ -725,13 +728,13 @@ export default function InvoiceList() {
                         </span>
                       </td>
                       <td className="table-cell-action">
-                        <div className="flex justify-end space-x-3">
+                        <div className="flex justify end space-x-3">
                           <button
                             onClick={() => handleView(invoice)}
                             className="action-icon-button"
                             title="Ver detalles"
                           >
-                            <Eye className="h-5 w 5 w-5" />
+                            <Eye className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => handleEmail(invoice)}
@@ -750,7 +753,7 @@ export default function InvoiceList() {
                           {invoice.status === 'draft' && (
                             <>
                               <button
-                                onClick={() => handleView(invoice)}
+                                onClick={() => handleEdit(invoice)}
                                 className="action-icon-button"
                                 title="Editar"
                               >
@@ -776,8 +779,8 @@ export default function InvoiceList() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex-1 flex justify-between sm:hidden">
+            <div className="mt-4 flex items-center justify-between border-t border-white/10 bg-gray-800/50 px-4 py-3 sm:px-6">
+              <div className="flex flex-1 justify-between sm:hidden">
                 <button
                   onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
                   disabled={currentPage === 1}
@@ -793,7 +796,7 @@ export default function InvoiceList() {
                   Siguiente
                 </button>
               </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-400">
                     Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a{' '}
@@ -804,11 +807,11 @@ export default function InvoiceList() {
                   </p>
                 </div>
                 <div>
-                  <nav className="relative z-0 inline-flex -space-x-px" aria-label="Pagination">
+                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                     <button
                       onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
                       disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/10 bg-gray-800/50 text-sm font-medium text-gray-300 hover:bg-gray-700"
+                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-white/10 hover:bg-white/5 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
                     >
                       <span className="sr-only">Anterior</span>
                       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -818,7 +821,7 @@ export default function InvoiceList() {
                     <button
                       onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
                       disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/10 bg-gray-800/50 text-sm font-medium text-gray-300 hover:bg-gray-700"
+                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-white/10 hover:bg-white/5 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
                     >
                       <span className="sr-only">Siguiente</span>
                       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -853,6 +856,21 @@ export default function InvoiceList() {
             loadStats();
           }}
         />
+
+        {selectedInvoice && (
+          <EditInvoiceModal
+            isOpen={showEditModal}
+            onClose={() => {
+              setShowEditModal(false);
+              setSelectedInvoice(null);
+            }}
+            onSuccess={() => {
+              loadInvoices();
+              loadStats();
+            }}
+            invoice={selectedInvoice}
+          />
+        )}
 
         <SendEmailModal
           isOpen={showEmailModal}

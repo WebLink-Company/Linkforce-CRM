@@ -146,6 +146,35 @@
   @apply bg-gray-600/50 rounded-full hover:bg-gray-500/50;
 }
 
+/* Modal animations */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-backdrop {
+  animation: modalFadeIn 0.3s ease-out forwards;
+}
+
+.modal-content {
+  animation: modalSlideUp 0.3s ease-out forwards;
+}
+
 /* Card and button animations */
 @keyframes slideUp {
   from {
@@ -193,6 +222,11 @@
 
 .animate-slide-up-delay-3 {
   animation: slideUp 0.5s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+.animate-slide-up-delay-4 {
+  animation: slideUp 0.5s ease-out 0.4s forwards;
   opacity: 0;
 }
 

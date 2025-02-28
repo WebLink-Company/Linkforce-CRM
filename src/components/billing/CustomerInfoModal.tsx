@@ -12,8 +12,8 @@ export default function CustomerInfoModal({ isOpen, onClose, customer }: Custome
   if (!isOpen || !customer) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-2xl">
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 modal-backdrop">
+      <div className="bg-white rounded-lg w-full max-w-2xl modal-content">
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-semibold">Información del Cliente</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-500">

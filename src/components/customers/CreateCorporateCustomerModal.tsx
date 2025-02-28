@@ -6,7 +6,7 @@ import IndustrySectorSelector from '../billing/IndustrySectorSelector';
 interface CreateCorporateCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (customer?: any) => void;
 }
 
 const formSectionClasses = "bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700/50";
@@ -55,7 +55,69 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
     });
   };
 
-  const validateForm = (): boolean => {
+  const validateField = async (field: keyof typeof formData, value: string) => {
+    const newErrors: Partial<Record<keyof typeof formData, string>> = {};
+
+    switch (field) {
+      case 'email':
+        if (value) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            newErrors.email = 'El formato del email es inválido';
+          } else {
+            // Check if email exists
+            const { data: existingEmail } = await supabase
+              .from('customers')
+              .select('id')
+              .eq('email', value)
+              .maybeSingle();
+
+            if (existingEmail) {
+              newErrors.email = 'Este correo electrónico ya está registrado';
+            }
+          }
+        }
+        break;
+
+      case 'identification_number':
+        if (value) {
+          const rncRegex = /^\d{9,11}$/;
+          if (!rncRegex.test(value)) {
+            newErrors.identification_number = 'El RNC debe tener entre 9 y 11 dígitos';
+          } else {
+            // Check if RNC exists
+            const { data: existingRNC } = await supabase
+              .from('customers')
+              .select('id')
+              .eq('identification_number', value)
+              .maybeSingle();
+
+            if (existingRNC) {
+              newErrors.identification_number = 'Este RNC ya está registrado';
+            }
+          }
+        }
+        break;
+
+      case 'phone':
+        if (value) {
+          const phoneRegex = /^\+?[\d\s-]{8,}$/;
+          if (!phoneRegex.test(value)) {
+            newErrors.phone = 'El formato del teléfono es inválido';
+          }
+        }
+        break;
+    }
+
+    setErrors(prev => ({ ...prev, [field]: newErrors[field] }));
+    return !newErrors[field];
+  };
+
+  const handleFieldBlur = async (field: keyof typeof formData) => {
+    await validateField(field, formData[field].toString());
+  };
+
+  const validateForm = async (): Promise<boolean> => {
     const newErrors: Partial<Record<keyof typeof formData, string>> = {};
 
     // Required fields
@@ -67,22 +129,15 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
     if (!formData.city) newErrors.city = 'La ciudad es requerida';
     if (!formData.state) newErrors.state = 'La provincia es requerida';
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (formData.email && !emailRegex.test(formData.email)) {
-      newErrors.email = 'El formato del email es inválido';
+    // Validate unique fields
+    if (formData.email) {
+      await validateField('email', formData.email);
     }
-
-    // Phone validation
-    const phoneRegex = /^\+?[\d\s-]{8,}$/;
-    if (formData.phone && !phoneRegex.test(formData.phone)) {
-      newErrors.phone = 'El formato del teléfono es inválido';
+    if (formData.identification_number) {
+      await validateField('identification_number', formData.identification_number);
     }
-
-    // RNC validation (9 or 11 digits)
-    const rncRegex = /^\d{9,11}$/;
-    if (formData.identification_number && !rncRegex.test(formData.identification_number)) {
-      newErrors.identification_number = 'El RNC debe tener entre 9 y 11 dígitos';
+    if (formData.phone) {
+      await validateField('phone', formData.phone);
     }
 
     setErrors(newErrors);
@@ -93,7 +148,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
     e.preventDefault();
     setGeneralError(null);
 
-    if (!validateForm()) return;
+    if (!await validateForm()) return;
     
     setLoading(true);
 
@@ -133,9 +188,19 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
         .select()
         .single();
 
-      if (customerError) throw customerError;
+      if (customerError) {
+        if (customerError.code === '23505') { // Unique constraint violation
+          if (customerError.message.includes('customers_email_key')) {
+            setErrors(prev => ({ ...prev, email: 'Este correo electrónico ya está registrado' }));
+          } else if (customerError.message.includes('customers_identification_number_key')) {
+            setErrors(prev => ({ ...prev, identification_number: 'Este RNC ya está registrado' }));
+          }
+          throw new Error('Ya existe un cliente con estos datos');
+        }
+        throw customerError;
+      }
 
-      onSuccess();
+      onSuccess(customer);
       onClose();
     } catch (error) {
       console.error('Error in customer creation:', error);
@@ -148,13 +213,13 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 modal-backdrop">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
       </div>
 
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl modal-content">
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
@@ -220,6 +285,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.identification_number}
                     onChange={(e) => setFormData({ ...formData, identification_number: e.target.value })}
+                    onBlur={() => handleFieldBlur('identification_number')}
                     className={inputClasses}
                   />
                   {errors.identification_number && (
@@ -263,6 +329,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onBlur={() => handleFieldBlur('email')}
                     className={inputClasses}
                   />
                   {errors.email && (
@@ -280,6 +347,7 @@ export default function CreateCorporateCustomerModal({ isOpen, onClose, onSucces
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onBlur={() => handleFieldBlur('phone')}
                     className={inputClasses}
                   />
                   {errors.phone && (

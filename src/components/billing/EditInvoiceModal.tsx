@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Building2, Phone, Mail as MailIcon, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Invoice, InvoiceItem } from '../../types/billing';
 
@@ -56,6 +56,7 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
       const { data, error } = await supabase
         .from('inventory_items')
         .select('*')
+        .eq('status', 'active')
         .order('name');
 
       if (error) throw error;
@@ -140,162 +141,247 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
   const total = items.reduce((sum, item) => sum + item.total_amount, 0);
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-4xl">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">Editar Factura</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 modal-backdrop">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl flex flex-col max-h-[90vh] border border-white/10 shadow-2xl modal-content">
+        {/* Fixed Header */}
+        <div className="sticky top-0 flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg z-50">
+          <h2 className="text-lg font-semibold text-white">Editar Factura #{invoice.ncf}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4">
-          {error && (
-            <div className="mb-4 bg-red-50 p-4 rounded-md">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="p-4 bg-red-500/20 border-b border-red-500/50">
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
 
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="due_date" className="block text-sm font-medium text-gray-700">
-                Fecha de Vencimiento
-              </label>
-              <input
-                type="date"
-                id="due_date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
+        {/* Scrollable Content */}
+        <form onSubmit={handleSubmit} id="edit-invoice-form" className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Customer Information */}
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+              <h3 className="text-base font-medium text-white mb-4">Información del Cliente</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-start space-x-2">
+                  <Building2 className="h-4 w-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-400">Razón Social</p>
+                    <p className="font-medium text-white">{invoice.customer?.full_name}</p>
+                    {invoice.customer?.commercial_name && (
+                      <p className="text-sm text-gray-400">{invoice.customer.commercial_name}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <MailIcon className="h-4 w-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-400">Email</p>
+                    <p className="font-medium text-white">{invoice.customer?.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <MapPin className="h-4 w-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-400">Dirección</p>
+                    <p className="font-medium text-white">{invoice.customer?.address}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <Phone className="h-4 w-4 mt-1 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-400">Teléfono</p>
+                    <p className="font-medium text-white">{invoice.customer?.phone}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-gray-700">Items</h3>
+            {/* Invoice Information */}
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+              <h3 className="text-base font-medium text-white mb-4">Información de la Factura</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="due_date" className="block text-sm font-medium text-gray-300">
+                    Fecha de Vencimiento
+                  </label>
+                  <input
+                    type="date"
+                    id="due_date"
+                    value={formData.due_date}
+                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-base font-medium text-white">Items</h3>
                 <button
                   type="button"
                   onClick={addItem}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Agregar Producto
                 </button>
               </div>
 
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Producto
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Cantidad
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Precio
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Desc %
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      ITBIS
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Total
-                    </th>
-                    <th scope="col" className="relative px-3 py-3">
-                      <span className="sr-only">Acciones</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {items.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-3 py-4">
-                        <select
-                          value={item.product_id}
-                          onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        >
-                          <option value="">Seleccione un producto</option>
-                          {products.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.code} - {product.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          value={item.unit_price}
-                          readOnly
-                          className="block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm sm:text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={item.discount_rate}
-                          onChange={(e) => updateItem(index, 'discount_rate', Number(e.target.value))}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 text-right">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(item.tax_amount)}
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 text-right">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(item.total_amount)}
-                      </td>
-                      <td className="px-3 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase w-[45%]">
+                        Producto
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase w-[10%]">
+                        Cantidad
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Precio
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Desc %
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        ITBIS
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                        Total
+                      </th>
+                      <th scope="col" className="relative px-3 py-3 w-[5%]">
+                        <span className="sr-only">Acciones</span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50">
-                  <tr>
-                    <td colSpan={5} className="px-3 py-4 text-right text-sm font-medium text-gray-900">
-                      Total:
-                    </td>
-                    <td className="px-3 py-4 text-right text-sm font-medium text-gray-900">
-                      {new Intl.NumberFormat('es-DO', {
-                        style: 'currency',
-                        currency: 'DOP'
-                      }).format(total)}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {items.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-4">
+                          <select
+                            value={item.product_id}
+                            onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                          >
+                            <option value="">Seleccione un producto</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.code} - {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                          />
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            value={item.unit_price}
+                            readOnly
+                            className="block w-full rounded-md bg-gray-800/50 border-gray-700/50 text-white shadow-sm sm:text-sm text-right"
+                          />
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={item.discount_rate}
+                            onChange={(e) => updateItem(index, 'discount_rate', Number(e.target.value))}
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
+                          />
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
+                          {new Intl.NumberFormat('es-DO', {
+                            style: 'currency',
+                            currency: 'DOP'
+                          }).format(item.tax_amount)}
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
+                          {new Intl.NumberFormat('es-DO', {
+                            style: 'currency',
+                            currency: 'DOP'
+                          }).format(item.total_amount)}
+                        </td>
+                        <td className="px-3 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="mt-4 flex justify-end">
+                <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Subtotal:</span>
+                      <span className="text-white">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">ITBIS (18%):</span>
+                      <span className="text-white">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(items.reduce((sum, item) => sum + item.tax_amount, 0))}
+                      </span>
+                    </div>
+                    {items.reduce((sum, item) => sum + item.discount_amount, 0) > 0 && (
+                      <div className="flex justify-between text-sm text-red-400">
+                        <span>Descuento:</span>
+                        <span>
+                          -{new Intl.NumberFormat('es-DO', {
+                            style: 'currency',
+                            currency: 'DOP'
+                          }).format(items.reduce((sum, item) => sum + item.discount_amount, 0))}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold border-t border-white/10 pt-2">
+                      <span className="text-white">Total:</span>
+                      <span className="text-white">
+                        {new Intl.NumberFormat('es-DO', {
+                          style: 'currency',
+                          currency: 'DOP'
+                        }).format(total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            {/* Notes */}
+            <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
                 Notas
               </label>
               <textarea
@@ -303,26 +389,29 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
               />
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
+          {/* Fixed Footer */}
+          <div className="sticky bottom-0 p-4 border-t border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-b-lg mt-auto">
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
+              >
+                {loading ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

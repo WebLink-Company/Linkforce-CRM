@@ -161,8 +161,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70] modal-backdrop">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10 shadow-2xl modal-content">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>

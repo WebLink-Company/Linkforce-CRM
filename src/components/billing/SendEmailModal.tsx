@@ -40,8 +40,8 @@ export default function SendEmailModal({ isOpen, onClose, invoice }: SendEmailMo
   if (!isOpen || !invoice) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70] modal-backdrop">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10 modal-content">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           {/* Top border */}
