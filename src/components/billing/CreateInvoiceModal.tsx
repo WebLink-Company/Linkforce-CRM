@@ -43,11 +43,21 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [nextNCF, setNextNCF] = useState<string | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       loadProducts();
       checkNextNCF();
+      // Reset form with today's date in local timezone
+      const today = new Date();
+      const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000))
+                        .toISOString()
+                        .split('T')[0];
+      setFormData({
+        ...initialFormState,
+        issue_date: localDate
+      });
     }
   }, [isOpen]);
 
@@ -101,15 +111,6 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
     }
   };
 
-  // Add this effect to update NCF when customer changes
-  useEffect(() => {
-    if (selectedCustomer) {
-      checkNextNCF();
-    } else {
-      setNextNCF(null);
-    }
-  }, [selectedCustomer]);
-
   const loadProducts = async () => {
     try {
       const { data, error } = await supabase
@@ -147,10 +148,9 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
       }
 
       // Get NCF
-      const { data: ncfData, error: ncfError } = await supabase
-        .rpc('generate_ncf', { 
-          p_sequence_type: selectedCustomer.invoice_type || 'B01'
-        });
+      const { data: ncfData, error: ncfError } = await supabase.rpc('generate_ncf', { 
+        p_sequence_type: selectedCustomer.invoice_type || 'B01'
+      });
 
       if (ncfError) throw ncfError;
 
@@ -260,6 +260,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
     setSelectedCustomer(customer);
     setShowCreateModal(false);
     setShowCreateCorporateCustomerModal(false);
+    setShowCustomerDropdown(false);
   };
 
   if (!isOpen) return null;
@@ -274,12 +275,10 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 modal-backdrop">
       <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl flex flex-col max-h-[90vh] modal-content">
-        {/* Glowing border effects */}
-        <div className="absolute inset-0 rounded-lg pointer-events-none">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
-          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+        {/* Glowing Background Effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
         </div>
 
         {/* Fixed Header */}
@@ -321,8 +320,13 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
               </div>
 
               <CustomerSelector
-                onSelect={setSelectedCustomer}
+                onSelect={(customer) => {
+                  setSelectedCustomer(customer);
+                  setShowCustomerDropdown(false);
+                }}
                 selectedCustomerId={selectedCustomer?.id}
+                showDropdown={showCustomerDropdown}
+                onDropdownVisibilityChange={setShowCustomerDropdown}
               />
 
               {selectedCustomer && (
@@ -550,7 +554,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onSuccess }: Creat
               </div>
 
               <div className="mt-4 flex justify-end">
-                <div className="w-64 bg-gray-800/50 p-4 rounded-lg border border-white/10">
+                <div className="w-64 bg-gray-900/50 p-4 rounded-lg border border-white/10">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Subtotal:</span>

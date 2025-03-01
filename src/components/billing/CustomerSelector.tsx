@@ -7,9 +7,17 @@ interface CustomerSelectorProps {
   onSelect: (customer: Customer) => void;
   selectedCustomerId?: string;
   onLoadComplete?: () => void;
+  showDropdown?: boolean;
+  onDropdownVisibilityChange?: (visible: boolean) => void;
 }
 
-export default function CustomerSelector({ onSelect, selectedCustomerId, onLoadComplete }: CustomerSelectorProps) {
+export default function CustomerSelector({ 
+  onSelect, 
+  selectedCustomerId, 
+  onLoadComplete,
+  showDropdown = true,
+  onDropdownVisibilityChange
+}: CustomerSelectorProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,6 +56,14 @@ export default function CustomerSelector({ onSelect, selectedCustomerId, onLoadC
     customer.identification_number.includes(searchTerm)
   );
 
+  const handleCustomerSelect = (customer: Customer) => {
+    onSelect(customer);
+    setSearchTerm('');
+    if (onDropdownVisibilityChange) {
+      onDropdownVisibilityChange(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="animate-pulse">
@@ -65,19 +81,24 @@ export default function CustomerSelector({ onSelect, selectedCustomerId, onLoadC
         <input
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (onDropdownVisibilityChange) {
+              onDropdownVisibilityChange(true);
+            }
+          }}
           placeholder="Buscar cliente por nombre o RNC..."
           className="block w-full pl-10 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
         />
       </div>
 
-      {searchTerm && (
+      {searchTerm && showDropdown && (
         <div className="mt-2 max-h-48 overflow-y-auto rounded-md bg-gray-800/50 border border-white/10">
           {filteredCustomers.map((customer) => (
             <button
               key={customer.id}
               type="button"
-              onClick={() => onSelect(customer)}
+              onClick={() => handleCustomerSelect(customer)}
               className={`w-full px-4 py-2 text-left hover:bg-gray-700/50 text-sm text-gray-300 ${
                 selectedCustomerId === customer.id ? 'bg-gray-700/50' : ''
               }`}

@@ -63,7 +63,7 @@ export default function InvoiceList() {
   useEffect(() => {
     loadInvoices();
     loadStats();
-  }, [activeFilter, dateRange]);
+  }, [activeFilter, dateRange, sortConfig]);
 
   const loadStats = async () => {
     try {
@@ -210,6 +210,14 @@ export default function InvoiceList() {
             case 'ncf':
               aValue = a.ncf;
               bValue = b.ncf;
+              break;
+            case 'issue_date':
+              aValue = new Date(a.issue_date).getTime();
+              bValue = new Date(b.issue_date).getTime();
+              break;
+            case 'total_amount':
+              aValue = a.total_amount;
+              bValue = b.total_amount;
               break;
             default:
               aValue = a[sortConfig.key as keyof Invoice];
@@ -674,8 +682,18 @@ export default function InvoiceList() {
                         {getSortIcon('customer')}
                       </div>
                     </th>
-                    <th scope="col" className="table-header th">FECHA</th>
-                    <th scope="col" className="table-header th text-right">TOTAL</th>
+                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('issue_date')}>
+                      <div className="flex items-center space-x-1">
+                        <span>FECHA</span>
+                        {getSortIcon('issue_date')}
+                      </div>
+                    </th>
+                    <th scope="col" className="table-header th text-right cursor-pointer" onClick={() => handleSort('total_amount')}>
+                      <div className="flex items-center justify-end space-x-1">
+                        <span>TOTAL</span>
+                        {getSortIcon('total_amount')}
+                      </div>
+                    </th>
                     <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('status')}>
                       <div className="flex items-center justify-center space-x-1">
                         <span>ESTADO</span>
@@ -714,7 +732,7 @@ export default function InvoiceList() {
                           'status-badge-warning'
                         }`}>
                           {invoice.status === 'issued' ? 'Emitida' :
-                           invoice.status === 'voided' ? 'Anulada' : 'Borrador'}
+                 invoice.status === 'voided' ? 'Anulada' : 'Borrador'}
                         </span>
                       </td>
                       <td className="table-cell text-center">
@@ -728,7 +746,7 @@ export default function InvoiceList() {
                         </span>
                       </td>
                       <td className="table-cell-action">
-                        <div className="flex justify end space-x-3">
+                        <div className="flex justify-end space-x-3">
                           <button
                             onClick={() => handleView(invoice)}
                             className="action-icon-button"
