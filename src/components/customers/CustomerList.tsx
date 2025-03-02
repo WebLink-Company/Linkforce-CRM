@@ -6,35 +6,41 @@ import CreateCorporateCustomerModal from './CreateCorporateCustomerModal';
 import CustomerViewerModal from './CustomerViewerModal';
 import CustomerFilters from './CustomerFilters';
 import { exportToCSV } from '../../utils/export';
+import CustomerTypeDialog from './CustomerTypeDialog';
+import CreateCustomerModal from './CreateCustomerModal';
+import ConfirmationModal from './ConfirmationModal';
+import CustomerStats from './CustomerStats';
 
 export default function CustomerList() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showIndividualModal, setShowIndividualModal] = useState(false);
+  const [showCorporateModal, setShowCorporateModal] = useState(false);
   const [showViewerModal, setShowViewerModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showCustomerTypeDialog, setShowCustomerTypeDialog] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const itemsPerPage = 10;
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
   const loadCustomers = async () => {
     try {
       const { data, error } = await customersAPI.getCustomers();
       if (error) throw error;
       setCustomers(data || []);
-      setTotalPages(Math.ceil((data?.length || 0) / itemsPerPage));
     } catch (error) {
       console.error('Error loading customers:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
 
   const handleExport = () => {
     if (customers.length > 0) {
@@ -44,7 +50,18 @@ export default function CustomerList() {
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
-    setShowCreateModal(true);
+    if (customer.type === 'corporate') {
+      setShowCorporateModal(true);
+      setShowIndividualModal(false);
+    } else {
+      setShowIndividualModal(true);
+      setShowCorporateModal(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setSelectedCustomer(null);
+    setShowCustomerTypeDialog(true);
   };
 
   const handleView = (customer: Customer) => {
@@ -53,15 +70,42 @@ export default function CustomerList() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Está seguro que desea eliminar este cliente?')) {
-      try {
-        const { error } = await customersAPI.deleteCustomer(id);
-        if (error) throw error;
-        await loadCustomers();
-      } catch (error) {
-        console.error('Error deleting customer:', error);
-      }
+    setSelectedCustomer(customers.find(c => c.id === id) || null);
+    setShowConfirmDelete(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedCustomer) return;
+    
+    setDeleteLoading(true);
+    try {
+      const { error } = await customersAPI.deleteCustomer(selectedCustomer.id);
+      if (error) throw error;
+      await loadCustomers();
+      setShowConfirmDelete(false);
+      setSelectedCustomer(null);
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const handleCustomerTypeSelect = (type: string) => {
+    setShowCustomerTypeDialog(false);
+    if (type === 'individual') {
+      setShowIndividualModal(true);
+      setShowCorporateModal(false);
+    } else {
+      setShowCorporateModal(true);
+      setShowIndividualModal(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    setShowIndividualModal(false);
+    setShowCorporateModal(false);
+    setSelectedCustomer(null);
   };
 
   const filteredCustomers = customers.filter(customer =>
@@ -101,10 +145,7 @@ export default function CustomerList() {
               Exportar
             </button>
             <button
-              onClick={() => {
-                setSelectedCustomer(null);
-                setShowCreateModal(true);
-              }}
+              onClick={handleCreate}
               className="btn btn-primary"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -112,6 +153,9 @@ export default function CustomerList() {
             </button>
           </div>
         </div>
+
+        {/* Customer Statistics Dashboard */}
+        <CustomerStats />
 
         <div className="mt-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -209,71 +253,24 @@ export default function CustomerList() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between border-t border-white/10 bg-gray-800/50 px-4 py-3 sm:px-6">
-              <div className="flex flex-1 justify-between sm:hidden">
-                <button
-                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-                  disabled={currentPage === 1}
-                  className="btn btn-secondary"
-                >
-                  Anterior
-                </button>
-                <button
-                  onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                  disabled={currentPage === totalPages}
-                  className="btn btn-secondary"
-                >
-                  Siguiente
-                </button>
-              </div>
-              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">
-                    Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a{' '}
-                    <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, customers.length)}
-                    </span>{' '}
-                    de <span className="font-medium">{customers.length}</span> resultados
-                  </p>
-                </div>
-                <div>
-                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                    <button
-                      onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-white/10 hover:bg-white/5 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                    >
-                      <span className="sr-only">Anterior</span>
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-white/10 hover:bg-white/5 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                    >
-                      <span className="sr-only">Siguiente</span>
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </nav>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
+        <CustomerTypeDialog
+          isOpen={showCustomerTypeDialog}
+          onClose={() => setShowCustomerTypeDialog(false)}
+          onSelectType={handleCustomerTypeSelect}
+        />
+
+        <CreateCustomerModal
+          isOpen={showIndividualModal}
+          onClose={handleModalClose}
+          onSuccess={loadCustomers}
+          editingCustomer={selectedCustomer}
+        />
+
         <CreateCorporateCustomerModal
-          isOpen={showCreateModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            setSelectedCustomer(null);
-          }}
+          isOpen={showCorporateModal}
+          onClose={handleModalClose}
           onSuccess={loadCustomers}
           editingCustomer={selectedCustomer}
         />
@@ -285,6 +282,18 @@ export default function CustomerList() {
             setSelectedCustomer(null);
           }}
           customer={selectedCustomer}
+        />
+
+        <ConfirmationModal
+          isOpen={showConfirmDelete}
+          onClose={() => {
+            setShowConfirmDelete(false);
+            setSelectedCustomer(null);
+          }}
+          onConfirm={confirmDelete}
+          title="Confirmar Eliminación"
+          message={`¿Está seguro que desea eliminar el cliente ${selectedCustomer?.full_name}? Esta acción no se puede deshacer.`}
+          loading={deleteLoading}
         />
       </div>
     </div>

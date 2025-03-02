@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, Search, Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit, 
   FileSpreadsheet, DollarSign, Package, Users, Calendar, ArrowUp, ArrowDown, 
-  XCircle, History, FileDown, Mail, Printer 
+  XCircle, History, FileDown, Mail, Printer, Clock, AlertTriangle, TrendingUp,
+  CreditCard, CheckCircle, FileBarChart
 } from 'lucide-react';
 import { billingAPI } from '../../lib/api/billing';
 import type { Invoice } from '../../types/billing';
@@ -12,8 +13,10 @@ import EditInvoiceModal from './EditInvoiceModal';
 import SendEmailModal from './SendEmailModal';
 import { exportToCSV } from '../../utils/export';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { jsPDF } from "jspdf";
+import StatsSummary from './StatsSummary';
+import FilterBadges from './FilterBadges';
+import InvoiceTable from './InvoiceTable';
 
 // Status order for sorting
 const STATUS_ORDER = {
@@ -45,11 +48,29 @@ export default function InvoiceList() {
     endDate: ''
   });
   const [stats, setStats] = useState({
-    issuedInvoices: { count: 0, total: 0 },
-    paidInvoices: { count: 0, total: 0 },
-    pendingInvoices: { count: 0, total: 0 },
-    voidedInvoices: { count: 0, total: 0 },
     draftInvoices: { count: 0, total: 0 },
+    pendingInvoices: { count: 0, total: 0 },
+    upcomingDueInvoices: { count: 0, total: 0 },
+    paidInvoices: { 
+      monthlyTotal: 0,
+      historicalTotal: 0,
+      count: 0,
+      lastPaymentDate: undefined as string | undefined
+    },
+    issuedInvoices: {
+      monthlyCount: 0,
+      monthlyTotal: 0,
+      historicalCount: 0,
+      historicalTotal: 0
+    },
+    overdueInvoices: { 
+      count: 0,
+      total: 0 
+    },
+    canceledInvoices: { 
+      monthlyCount: 0,
+      monthlyTotal: 0 
+    },
     topProducts: [] as { name: string; total: number }[]
   });
   const [sortConfig, setSortConfig] = useState<{
@@ -72,44 +93,88 @@ export default function InvoiceList() {
 
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
       
-      // Filter invoices for current month
-      const monthlyInvoices = monthlyData.filter(inv => 
-        new Date(inv.issue_date) >= firstDayOfMonth
-      );
-
-      // Calculate issued invoices
-      const issuedInvoices = monthlyInvoices.filter(inv => inv.status === 'issued');
-      const issuedTotal = issuedInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
-
-      // Calculate paid invoices
-      const paidInvoices = monthlyInvoices.filter(inv => 
-        inv.status === 'issued' && inv.payment_status === 'paid'
-      );
-      const paidTotal = paidInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+      // Calculate draft invoices
+      const draftInvoices = monthlyData.filter(inv => inv.status === 'draft');
+      const draftTotal = draftInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
 
       // Calculate pending invoices
-      const pendingInvoices = monthlyInvoices.filter(inv => 
+      const pendingInvoices = monthlyData.filter(inv => 
         inv.status === 'issued' && inv.payment_status !== 'paid'
       );
-      const pendingTotal = pendingInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+      const pendingTotal = pendingInvoices.reduce((sum, inv) => sum + (
+        inv.total_amount - (inv.payments?.reduce((p, c) => p + c.amount, 0) || 0)
+      ), 0);
 
-      // Calculate voided invoices
-      const voidedInvoices = monthlyInvoices.filter(inv => inv.status === 'voided');
-      const voidedTotal = voidedInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+      // Calculate upcoming due invoices
+      const upcomingDueInvoices = monthlyData.filter(inv => 
+        inv.status === 'issued' &&
+        inv.payment_status !== 'paid' &&
+        new Date(inv.due_date) > now &&
+        new Date(inv.due_date) <= nextWeek
+      );
+      const upcomingDueTotal = upcomingDueInvoices.reduce((sum, inv) => sum + (
+        inv.total_amount - (inv.payments?.reduce((p, c) => p + c.amount, 0) || 0)
+      ), 0);
 
-      // Calculate draft invoices
-      const draftInvoices = monthlyInvoices.filter(inv => inv.status === 'draft');
-      const draftTotal = draftInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+      // Calculate paid invoices
+      const paidInvoicesThisMonth = monthlyData.filter(inv => 
+        inv.status === 'issued' && 
+        inv.payment_status === 'paid' &&
+        inv.payments?.some(p => new Date(p.payment_date) >= firstDayOfMonth)
+      );
+      const monthlyPaidTotal = paidInvoicesThisMonth.reduce((sum, inv) => sum + inv.total_amount, 0);
+
+      const allPaidInvoices = monthlyData.filter(inv => 
+        inv.status === 'issued' && 
+        inv.payment_status === 'paid'
+      );
+      const historicalPaidTotal = allPaidInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+
+      // Get last payment date
+      const lastPaymentDate = monthlyData
+        .flatMap(inv => inv.payments || [])
+        .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())[0]?.payment_date;
+
+      // Calculate issued invoices (excluding drafts)
+      const issuedThisMonth = monthlyData.filter(inv => 
+        inv.status === 'issued' &&
+        new Date(inv.issue_date) >= firstDayOfMonth
+      );
+      const monthlyIssuedTotal = issuedThisMonth.reduce((sum, inv) => sum + inv.total_amount, 0);
+
+      const allIssuedInvoices = monthlyData.filter(inv => inv.status === 'issued');
+      const historicalIssuedTotal = allIssuedInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+
+      // Calculate overdue invoices
+      const overdueInvoices = monthlyData.filter(inv => 
+        inv.status === 'issued' &&
+        inv.payment_status !== 'paid' &&
+        new Date(inv.due_date) < now
+      );
+      const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + (
+        inv.total_amount - (inv.payments?.reduce((p, c) => p + c.amount, 0) || 0)
+      ), 0);
+
+      // Calculate canceled invoices
+      const canceledThisMonth = monthlyData.filter(inv => 
+        inv.status === 'voided' &&
+        new Date(inv.voided_at || '') >= firstDayOfMonth
+      );
+      const canceledTotal = canceledThisMonth.reduce((sum, inv) => sum + inv.total_amount, 0);
 
       // Calculate top products
       const productSales = new Map<string, number>();
-      monthlyInvoices.forEach(invoice => {
-        invoice.items?.forEach(item => {
-          const product = item.product?.name || '';
-          const currentTotal = productSales.get(product) || 0;
-          productSales.set(product, currentTotal + item.total_amount);
-        });
+      monthlyData.forEach(invoice => {
+        if (invoice.status === 'issued') {
+          invoice.items?.forEach(item => {
+            const product = item.product?.name || '';
+            const currentTotal = productSales.get(product) || 0;
+            productSales.set(product, currentTotal + item.total_amount);
+          });
+        }
       });
 
       const topProducts = Array.from(productSales.entries())
@@ -118,11 +183,38 @@ export default function InvoiceList() {
         .map(([name, total]) => ({ name, total }));
 
       setStats({
-        issuedInvoices: { count: issuedInvoices.length, total: issuedTotal },
-        paidInvoices: { count: paidInvoices.length, total: paidTotal },
-        pendingInvoices: { count: pendingInvoices.length, total: pendingTotal },
-        voidedInvoices: { count: voidedInvoices.length, total: voidedTotal },
-        draftInvoices: { count: draftInvoices.length, total: draftTotal },
+        draftInvoices: { 
+          count: draftInvoices.length, 
+          total: draftTotal 
+        },
+        pendingInvoices: { 
+          count: pendingInvoices.length, 
+          total: pendingTotal 
+        },
+        upcomingDueInvoices: { 
+          count: upcomingDueInvoices.length, 
+          total: upcomingDueTotal 
+        },
+        paidInvoices: { 
+          monthlyTotal: monthlyPaidTotal,
+          historicalTotal: historicalPaidTotal,
+          count: paidInvoicesThisMonth.length,
+          lastPaymentDate
+        },
+        issuedInvoices: {
+          monthlyCount: issuedThisMonth.length,
+          monthlyTotal: monthlyIssuedTotal,
+          historicalCount: allIssuedInvoices.length,
+          historicalTotal: historicalIssuedTotal
+        },
+        overdueInvoices: {
+          count: overdueInvoices.length,
+          total: overdueTotal
+        },
+        canceledInvoices: { 
+          monthlyCount: canceledThisMonth.length,
+          monthlyTotal: canceledTotal 
+        },
         topProducts
       });
     } catch (error) {
@@ -215,6 +307,12 @@ export default function InvoiceList() {
               aValue = new Date(a.issue_date).getTime();
               bValue = new Date(b.issue_date).getTime();
               break;
+            case 'last_payment_date':
+              const aPayments = a.payments || [];
+              const bPayments = b.payments || [];
+              aValue = aPayments.length ? new Date(aPayments[aPayments.length - 1].payment_date).getTime() : 0;
+              bValue = bPayments.length ? new Date(bPayments[bPayments.length - 1].payment_date).getTime() : 0;
+              break;
             case 'total_amount':
               aValue = a.total_amount;
               bValue = b.total_amount;
@@ -248,44 +346,9 @@ export default function InvoiceList() {
     setSortConfig({ key, direction });
   };
 
-  const getSortIcon = (key: string) => {
-    if (!sortConfig || sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'asc' ? 
-      <ArrowUp className="h-4 w-4" /> : 
-      <ArrowDown className="h-4 w-4" />;
-  };
-
-  const handleFilter = (filter: string) => {
-    setActiveFilter(activeFilter === filter ? '' : filter);
-    setCurrentPage(1);
-    // Clear date range when changing filters
-    if (filter !== 'history') {
-      setDateRange({ startDate: '', endDate: '' });
-    }
-  };
-
-  const getFilterDescription = () => {
-    if (dateRange.startDate && dateRange.endDate) {
-      return `Facturas del ${new Date(dateRange.startDate).toLocaleDateString()} al ${new Date(dateRange.endDate).toLocaleDateString()}`;
-    }
-
-    switch (activeFilter) {
-      case 'month':
-        return `Facturas Emitidas de ${currentMonth}`;
-      case 'draft':
-        return 'Borradores de Facturas';
-      case 'paid':
-        return `Facturas Cobradas de ${currentMonth}`;
-      case 'pending':
-        return `Facturas por Cobrar de ${currentMonth}`;
-      case 'voided':
-        return `Facturas Anuladas`;
-      case 'history':
-        return 'Historial de Facturas';
-      default:
-        return 'Facturas Emitidas';
+  const handleExport = () => {
+    if (invoices.length > 0) {
+      exportToCSV(invoices, 'invoices');
     }
   };
 
@@ -371,9 +434,35 @@ export default function InvoiceList() {
     }
   };
 
-  const handleExport = () => {
-    if (invoices.length > 0) {
-      exportToCSV(invoices, 'invoices');
+  const handleFilter = (filter: string) => {
+    setActiveFilter(activeFilter === filter ? '' : filter);
+    setCurrentPage(1);
+    // Clear date range when changing filters
+    if (filter !== 'history') {
+      setDateRange({ startDate: '', endDate: '' });
+    }
+  };
+
+  const getFilterDescription = () => {
+    if (dateRange.startDate && dateRange.endDate) {
+      return `Facturas del ${new Date(dateRange.startDate).toLocaleDateString()} al ${new Date(dateRange.endDate).toLocaleDateString()}`;
+    }
+
+    switch (activeFilter) {
+      case 'month':
+        return `Facturas Emitidas de ${currentMonth}`;
+      case 'draft':
+        return 'Borradores de Facturas';
+      case 'paid':
+        return `Facturas Cobradas de ${currentMonth}`;
+      case 'pending':
+        return `Facturas por Cobrar de ${currentMonth}`;
+      case 'voided':
+        return `Facturas Anuladas`;
+      case 'history':
+        return 'Historial de Facturas';
+      default:
+        return 'Facturas Emitidas';
     }
   };
 
@@ -431,178 +520,14 @@ export default function InvoiceList() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-          {/* Issued Invoices */}
-          <button
-            onClick={() => handleFilter('month')}
-            className={`bg-gray-800/50 overflow-hidden rounded-lg border ${
-              activeFilter === 'month' ? 'border-blue-500/50' : 'border-white/10'
-            } animate-slide-up transition-colors`}
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FileSpreadsheet className="h-6 w-6 text-blue-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas de {currentMonth}
-                    </dt>
-                    <dd className="mt-2">
-                      <div className="text-lg font-semibold text-blue-400">
-                        {stats.issuedInvoices.count} facturas
-                      </div>
-                      <div className="text-2xl font-semibold text-blue-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(stats.issuedInvoices.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </button>
+        <StatsSummary stats={stats} onCardClick={handleFilter} activeFilter={activeFilter} />
 
-          {/* Paid Invoices */}
-          <button
-            onClick={() => handleFilter('paid')}
-            className={`bg-gray-800/50 overflow-hidden rounded-lg border ${
-              activeFilter === 'paid' ? 'border-emerald-500/50' : 'border-white/10'
-            } animate-slide-up-delay-1 transition-colors`}
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DollarSign className="h-6 w-6 text-emerald-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas Cobradas de {currentMonth}
-                    </dt>
-                    <dd className="mt-2">
-                      <div className="text-lg font-semibold text-emerald-400">
-                        {stats.paidInvoices.count} facturas
-                      </div>
-                      <div className="text-2xl font-semibold text-emerald-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(stats.paidInvoices.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </button>
-
-          {/* Pending Invoices */}
-          <button
-            onClick={() => handleFilter('pending')}
-            className={`bg-gray-800/50 overflow-hidden rounded-lg border ${
-              activeFilter === 'pending' ? 'border-red-500/50' : 'border-white/10'
-            } animate-slide-up-delay-2 transition-colors`}
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FileText className="h-6 w-6 text-red-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Facturas por Cobrar de {currentMonth}
-                    </dt>
-                    <dd className="mt-2">
-                      <div className="text-base font-semibold text-red-400">
-                        {stats.pendingInvoices.count} facturas
-                      </div>
-                      <div className="text-lg font-semibold text-red-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(stats.pendingInvoices.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </button>
-
-          {/* Draft Invoices */}
-          <button
-            onClick={() => handleFilter('draft')}
-            className={`bg-gray-800/50 overflow-hidden rounded-lg border ${
-              activeFilter === 'draft' ? 'border-yellow-500/50' : 'border-white/10'
-            } animate-slide-up-delay-3 transition-colors`}
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FileText className="h-6 w-6 text-yellow-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Borradores de {currentMonth}
-                    </dt>
-                    <dd className="mt-2">
-                      <div className="text-lg font-semibold text-yellow-400">
-                        {stats.draftInvoices.count} facturas
-                      </div>
-                      <div className="text-2xl font-semibold text-yellow-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(stats.draftInvoices.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </button>
-
-          {/* Voided Invoices */}
-          <button
-            onClick={() => handleFilter('voided')}
-            className={`bg-gray-800/50 overflow-hidden rounded-lg border ${
-              activeFilter === 'voided' ? 'border-gray-500/50' : 'border-white/10'
-            } animate-slide-up-delay-4 transition-colors`}
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <XCircle className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Anuladas de {currentMonth}
-                    </dt>
-                    <dd className="mt-2">
-                      <div className="text-lg font-semibold text-gray-400">
-                        {stats.voidedInvoices.count} facturas
-                      </div>
-                      <div className="text-2xl font-semibold text-gray-300">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(stats.voidedInvoices.total)}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </button>
-        </div>
+        <FilterBadges
+          activeFilter={activeFilter}
+          onFilter={handleFilter}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+        />
 
         <div className="mt-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -620,33 +545,14 @@ export default function InvoiceList() {
                 />
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {/* Date Range Filter */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={dateRange.startDate}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                  className="form-input w-40"
-                />
-                <span className="text-gray-400">a</span>
-                <input
-                  type="date"
-                  value={dateRange.endDate}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                  className="form-input w-40"
-                />
-              </div>
-
-              {/* History Button */}
+            <div className="flex gap-2">
               <button
-                onClick={() => handleFilter('history')}
-                className={`btn ${activeFilter === 'history' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn btn-secondary"
               >
-                <History className="h-4 w-4 mr-2" />
-                Historial
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
               </button>
-
               <button
                 onClick={loadInvoices}
                 className="btn btn-secondary"
@@ -665,135 +571,16 @@ export default function InvoiceList() {
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <div className="table-container">
-              <table className="min-w-full divide-y divide-white/5">
-                <thead className="table-header">
-                  <tr>
-                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('ncf')}>
-                      <div className="flex items-center space-x-1">
-                        <span>NCF</span>
-                        {getSortIcon('ncf')}
-                      </div>
-                    </th>
-                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('customer')}>
-                      <div className="flex items-center space-x-1">
-                        <span>CLIENTE</span>
-                        {getSortIcon('customer')}
-                      </div>
-                    </th>
-                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('issue_date')}>
-                      <div className="flex items-center space-x-1">
-                        <span>FECHA</span>
-                        {getSortIcon('issue_date')}
-                      </div>
-                    </th>
-                    <th scope="col" className="table-header th text-right cursor-pointer" onClick={() => handleSort('total_amount')}>
-                      <div className="flex items-center justify-end space-x-1">
-                        <span>TOTAL</span>
-                        {getSortIcon('total_amount')}
-                      </div>
-                    </th>
-                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('status')}>
-                      <div className="flex items-center justify-center space-x-1">
-                        <span>ESTADO</span>
-                        {getSortIcon('status')}
-                      </div>
-                    </th>
-                    <th scope="col" className="table-header th cursor-pointer" onClick={() => handleSort('payment_status')}>
-                      <div className="flex items-center justify-center space-x-1">
-                        <span>ESTADO DE PAGO</span>
-                        {getSortIcon('payment_status')}
-                      </div>
-                    </th>
-                    <th scope="col" className="relative table-header th">
-                      <span className="sr-only">Acciones</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {paginatedInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="table-row">
-                      <td className="table-cell font-medium">{invoice.ncf}</td>
-                      <td className="table-cell">{invoice.customer?.full_name}</td>
-                      <td className="table-cell">
-                        {new Date(invoice.issue_date).toLocaleDateString()}
-                      </td>
-                      <td className="table-cell text-right">
-                        {new Intl.NumberFormat('es-DO', {
-                          style: 'currency',
-                          currency: 'DOP'
-                        }).format(invoice.total_amount)}
-                      </td>
-                      <td className="table-cell text-center">
-                        <span className={`status-badge ${
-                          invoice.status === 'issued' ? 'status-badge-success' :
-                          invoice.status === 'voided' ? 'status-badge-error' :
-                          'status-badge-warning'
-                        }`}>
-                          {invoice.status === 'issued' ? 'Emitida' :
-                 invoice.status === 'voided' ? 'Anulada' : 'Borrador'}
-                        </span>
-                      </td>
-                      <td className="table-cell text-center">
-                        <span className={`status-badge ${
-                          invoice.payment_status === 'paid' ? 'status-badge-success' :
-                          invoice.payment_status === 'partial' ? 'status-badge-warning' :
-                          'status-badge-error'
-                        }`}>
-                          {invoice.payment_status === 'paid' ? 'Pagada' :
-                           invoice.payment_status === 'partial' ? 'Parcial' : 'Pendiente'}
-                        </span>
-                      </td>
-                      <td className="table-cell-action">
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            onClick={() => handleView(invoice)}
-                            className="action-icon-button"
-                            title="Ver detalles"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleEmail(invoice)}
-                            className="action-icon-button"
-                            title="Enviar por email"
-                          >
-                            <Mail className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleExportPDF(invoice)}
-                            className="action-icon-button"
-                            title="Exportar a PDF"
-                          >
-                            <FileDown className="h-5 w-5" />
-                          </button>
-                          {invoice.status === 'draft' && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(invoice)}
-                                className="action-icon-button"
-                                title="Editar"
-                              >
-                                <Edit className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(invoice.id)}
-                                className="text-red-400 hover:text-red-300 action-icon-button"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <InvoiceTable
+            invoices={paginatedInvoices}
+            onView={handleView}
+            onEmail={handleEmail}
+            onExportPDF={handleExportPDF}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            sortConfig={sortConfig}
+            onSort={handleSort}
+          />
 
           {/* Pagination */}
           {totalPages > 1 && (

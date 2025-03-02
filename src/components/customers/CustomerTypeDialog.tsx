@@ -11,8 +11,8 @@ export default function CustomerTypeDialog({ isOpen, onClose, onSelectType }: Cu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
-      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10 shadow-2xl">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70] animate-fade-in">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10 shadow-2xl transform transition-all duration-300 animate-slide-up">
         {/* Glowing border effects */}
         <div className="absolute inset-0 rounded-lg pointer-events-none">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
