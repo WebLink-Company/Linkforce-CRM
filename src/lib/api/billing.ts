@@ -160,7 +160,6 @@ class BillingAPI extends BaseAPI {
     try {
       const { error } = await supabase
         .rpc('issue_invoice', { p_invoice_id: invoiceId });
-
       if (error) throw error;
       return { error: null };
     } catch (error) {
@@ -173,6 +172,7 @@ class BillingAPI extends BaseAPI {
     try {
       const { error } = await supabase
         .rpc('void_invoice', { p_invoice_id: invoiceId, p_reason: reason });
+
 
       if (error) throw error;
       return { error: null };

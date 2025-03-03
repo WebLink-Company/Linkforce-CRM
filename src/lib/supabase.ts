@@ -24,7 +24,6 @@ export const getCurrentSchema = (): string => {
       console.log('🛠️ Defaulting to public schema in dev mode');
       return 'public';
     }
-
     // ✅ Production schema mapping
     if (hostname.includes('quimicinter')) {
       console.log('🌍 Using schema: quimicinter');
@@ -33,6 +32,7 @@ export const getCurrentSchema = (): string => {
     if (hostname.includes('qa')) {
       console.log('🌍 Using schema: qalinkforce');
       return 'qalinkforce';
+
     }
 
     console.log('🌍 Defaulting to public schema');
