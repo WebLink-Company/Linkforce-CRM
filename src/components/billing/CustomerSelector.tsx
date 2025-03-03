@@ -1,172 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Customer } from '../../types/customer';
-import CustomerInfoModal from './CustomerInfoModal';
+import { User } from 'lucide-react';
 
 interface CustomerSelectorProps {
   onSelect: (customer: Customer) => void;
   selectedCustomerId?: string;
+  onLoadComplete?: () => void;
+  showDropdown?: boolean;
+  onDropdownVisibilityChange?: (visible: boolean) => void;
 }
 
-const INDUSTRY_SECTORS = [
-  { code: 'A', name: 'Agricultura, Ganadería, Silvicultura y Pesca' },
-  { code: 'B', name: 'Explotación de Minas y Canteras' },
-  { code: 'C', name: 'Industrias Manufactureras' },
-  { code: 'D', name: 'Suministro de Electricidad, Gas, Vapor y Aire Acondicionado' },
-  { code: 'E', name: 'Suministro de Agua; Evacuación de Aguas Residuales' },
-  { code: 'F', name: 'Construcción' },
-  { code: 'G', name: 'Comercio al por Mayor y al por Menor' },
-  { code: 'H', name: 'Transporte y Almacenamiento' },
-  { code: 'I', name: 'Actividades de Alojamiento y Servicios de Comidas' },
-  { code: 'J', name: 'Información y Comunicaciones' },
-  { code: 'K', name: 'Actividades Financieras y de Seguros' },
-  { code: 'L', name: 'Actividades Inmobiliarias' },
-  { code: 'M', name: 'Actividades Profesionales, Científicas y Técnicas' },
-  { code: 'N', name: 'Actividades de Servicios Administrativos y de Apoyo' },
-  { code: 'O', name: 'Administración Pública y Defensa' },
-  { code: 'P', name: 'Enseñanza' },
-  { code: 'Q', name: 'Actividades de Atención de la Salud Humana' },
-  { code: 'R', name: 'Actividades Artísticas, de Entretenimiento y Recreativas' },
-  { code: 'S', name: 'Otras Actividades de Servicios' },
-];
-
-export default function CustomerSelector({ onSelect, selectedCustomerId }: CustomerSelectorProps) {
+export default function CustomerSelector({ 
+  onSelect, 
+  selectedCustomerId, 
+  onLoadComplete,
+  showDropdown = true,
+  onDropdownVisibilityChange
+}: CustomerSelectorProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedSector, setSelectedSector] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInfoModal, setShowInfoModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .is('deleted_at', null)
+        .order('full_name');
+
+      if (error) throw error;
+      setCustomers(data || []);
+      if (onLoadComplete) onLoadComplete();
+    } catch (error) {
+      console.error('Error loading customers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadCustomers();
-  }, [selectedSector]);
+  }, []);
 
-  const loadCustomers = async () => {
-    let query = supabase
-      .from('customers')
-      .select('*')
-      .eq('status', 'active')
-      .is('deleted_at', null);
-
-    if (selectedSector) {
-      query = query.eq('industry_sector', selectedSector);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error loading customers:', error);
-      return;
-    }
-
-    setCustomers(data || []);
+  // Function to add a new customer to the list
+  const addCustomer = (newCustomer: Customer) => {
+    setCustomers(prev => [...prev, newCustomer]);
+    // Automatically select the new customer
+    onSelect(newCustomer);
   };
 
-  const handleCustomerSelect = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setShowInfoModal(true);
-    onSelect(customer);
-  };
-
-  const filteredCustomers = customers.filter(customer => 
+  const filteredCustomers = customers.filter(customer =>
     customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.identification_number.includes(searchTerm)
   );
 
+  const handleCustomerSelect = (customer: Customer) => {
+    onSelect(customer);
+    setSearchTerm('');
+    if (onDropdownVisibilityChange) {
+      onDropdownVisibilityChange(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse">
+        <div className="h-10 bg-gray-700/50 rounded-md"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="sector" className="block text-sm font-medium text-gray-700">
-            Sector Industrial
-          </label>
-          <select
-            id="sector"
-            value={selectedSector}
-            onChange={(e) => setSelectedSector(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-          >
-            <option value="">Todos los sectores</option>
-            {INDUSTRY_SECTORS.map((sector) => (
-              <option key={sector.code} value={sector.code}>
-                {sector.name}
-              </option>
-            ))}
-          </select>
+    <div>
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
+          <User className="h-5 w-5 text-gray-400" />
         </div>
-
-        <div>
-          <label htmlFor="search" className="block text-sm font-medium text-gray-700">
-            Buscar Cliente
-          </label>
-          <input
-            type="text"
-            id="search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre o RNC..."
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-          />
-        </div>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (onDropdownVisibilityChange) {
+              onDropdownVisibilityChange(true);
+            }
+          }}
+          placeholder="Buscar cliente por nombre o RNC..."
+          className="block w-full pl-10 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+        />
       </div>
 
-      <div className="mt-4">
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-300">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">
-                  RNC
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Razón Social
-                </th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Tipo de Comprobante
-                </th>
-                <th scope="col" className="relative py-3.5 pl-3 pr-4">
-                  <span className="sr-only">Seleccionar</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {filteredCustomers.map((customer) => (
-                <tr 
-                  key={customer.id}
-                  className={`hover:bg-gray-50 ${selectedCustomerId === customer.id ? 'bg-blue-50' : ''}`}
-                >
-                  <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
-                    {customer.identification_number}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {customer.full_name}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    {customer.invoice_type === 'B01' && 'Crédito Fiscal (B01)'}
-                    {customer.invoice_type === 'B02' && 'Consumo (B02)'}
-                    {customer.invoice_type === 'B14' && 'Gubernamental (B14)'}
-                    {customer.invoice_type === 'B15' && 'Exportación (B15)'}
-                  </td>
-                  <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleCustomerSelect(customer)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Seleccionar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {searchTerm && showDropdown && (
+        <div className="mt-2 max-h-48 overflow-y-auto rounded-md bg-gray-800/50 border border-white/10">
+          {filteredCustomers.map((customer) => (
+            <button
+              key={customer.id}
+              type="button"
+              onClick={() => handleCustomerSelect(customer)}
+              className={`w-full px-4 py-2 text-left hover:bg-gray-700/50 text-sm text-gray-300 ${
+                selectedCustomerId === customer.id ? 'bg-gray-700/50' : ''
+              }`}
+            >
+              <div className="font-medium">{customer.full_name}</div>
+              <div className="text-xs text-gray-400">RNC: {customer.identification_number}</div>
+            </button>
+          ))}
+          {filteredCustomers.length === 0 && (
+            <div className="px-4 py-2 text-sm text-gray-400">
+              No se encontraron clientes
+            </div>
+          )}
         </div>
-      </div>
-
-      <CustomerInfoModal
-        isOpen={showInfoModal}
-        onClose={() => setShowInfoModal(false)}
-        customer={selectedCustomer}
-      />
+      )}
     </div>
   );
 }

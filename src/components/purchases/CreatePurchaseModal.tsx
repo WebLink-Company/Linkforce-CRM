@@ -207,29 +207,37 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg w-full max-w-4xl my-8">
-        <div className="flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold">Nueva Orden de Compra</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
+        {/* Glowing border effects */}
+        <div className="absolute inset-0 rounded-lg pointer-events-none">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+        </div>
+
+        <div className="flex justify-between items-center p-4 border-b border-white/10 sticky top-0 bg-gray-900/95 z-10">
+          <h2 className="text-lg font-semibold text-white">Nueva Orden de Compra</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
           {error && (
-            <div className="mb-6 bg-red-50 p-4 rounded-md">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
+              <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
           <div className="space-y-6">
             {/* Basic Information */}
-            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-              <h3 className="text-sm font-medium text-gray-900">Información Básica</h3>
+            <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
+              <h3 className="text-sm font-medium text-white">Información Básica</h3>
               
               <div>
-                <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
                   Proveedor *
                 </label>
                 <select
@@ -237,7 +245,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                   required
                   value={formData.supplier_id}
                   onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                 >
                   <option value="">Seleccione un proveedor</option>
                   {suppliers.map((supplier) => (
@@ -250,7 +258,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="issue_date" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="issue_date" className="block text-sm font-medium text-gray-300">
                     Fecha de Emisión *
                   </label>
                   <input
@@ -259,12 +267,12 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.issue_date}
                     onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="expected_date" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="expected_date" className="block text-sm font-medium text-gray-300">
                     Fecha Esperada
                   </label>
                   <input
@@ -272,21 +280,21 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                     id="expected_date"
                     value={formData.expected_date}
                     onChange={(e) => setFormData({ ...formData, expected_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Items */}
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-gray-800/50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center space-x-4">
-                  <h3 className="text-sm font-medium text-gray-900">Productos *</h3>
+                  <h3 className="text-sm font-medium text-white">Productos *</h3>
                   <button
                     type="button"
                     onClick={() => setShowCreateProductModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Crear Producto
@@ -295,7 +303,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                 <button
                   type="button"
                   onClick={addItem}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Agregar Producto
@@ -303,25 +311,25 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-white/10">
+                  <thead>
                     <tr>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                         Producto
                       </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
                         Cantidad
                       </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
                         Precio
                       </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
                         Desc %
                       </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
                         ITBIS
                       </th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase">
                         Total
                       </th>
                       <th scope="col" className="relative px-3 py-3">
@@ -329,7 +337,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-white/10">
                     {items.map((item, index) => (
                       <tr key={index}>
                         <td className="px-3 py-4">
@@ -337,7 +345,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             value={item.product_id}
                             onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                             required
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                           >
                             <option value="">Seleccione un producto</option>
                             {products.map((product) => (
@@ -354,7 +362,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             required
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
                         <td className="px-3 py-4">
@@ -365,7 +373,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             value={item.unit_price}
                             onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                             required
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
                         <td className="px-3 py-4">
@@ -375,16 +383,16 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                             max="100"
                             value={item.discount_rate}
                             onChange={(e) => updateItem(index, 'discount_rate', Number(e.target.value))}
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm text-right"
                           />
                         </td>
-                        <td className="px-3 py-4 text-sm text-gray-900 text-right">
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
                           }).format(item.tax_amount)}
                         </td>
-                        <td className="px-3 py-4 text-sm text-gray-900 text-right">
+                        <td className="px-3 py-4 text-sm text-gray-300 text-right">
                           {new Intl.NumberFormat('es-DO', {
                             style: 'currency',
                             currency: 'DOP'
@@ -394,7 +402,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-400 hover:text-red-300"
                           >
                             <Trash2 className="h-5 w-5" />
                           </button>
@@ -402,39 +410,59 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan={3} className="px-3 py-4 text-sm font-medium text-gray-900">
-                        Totales
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 text-right">
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="mt-4 flex justify-end">
+                <div className="w-64 bg-gray-900/50 p-4 rounded-lg border border-white/10">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Subtotal:</span>
+                      <span className="text-white">
                         {new Intl.NumberFormat('es-DO', {
                           style: 'currency',
                           currency: 'DOP'
-                        }).format(totals.discount_amount)}
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 text-right">
+                        }).format(totals.subtotal)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">ITBIS (18%):</span>
+                      <span className="text-white">
                         {new Intl.NumberFormat('es-DO', {
                           style: 'currency',
                           currency: 'DOP'
                         }).format(totals.tax_amount)}
-                      </td>
-                      <td className="px-3 py-4 text-sm font-medium text-gray-900 text-right">
+                      </span>
+                    </div>
+                    {totals.discount_amount > 0 && (
+                      <div className="flex justify-between text-sm text-red-400">
+                        <span>Descuento:</span>
+                        <span>
+                          -{new Intl.NumberFormat('es-DO', {
+                            style: 'currency',
+                            currency: 'DOP'
+                          }).format(totals.discount_amount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold border-t border-white/10 pt-2 mt-2">
+                      <span className="text-white">Total:</span>
+                      <span className="text-white">
                         {new Intl.NumberFormat('es-DO', {
                           style: 'currency',
                           currency: 'DOP'
                         }).format(totals.total_amount)}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Notes */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            <div className="bg-gray-800/50 p-4 rounded-lg">
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-300">
                 Notas
               </label>
               <textarea
@@ -442,7 +470,8 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                placeholder="Notas o comentarios adicionales..."
               />
             </div>
           </div>
@@ -451,20 +480,21 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
             >
               {loading ? 'Guardando...' : 'Crear Orden'}
             </button>
           </div>
         </form>
       </div>
+
       <CreatePurchaseProductModal
         isOpen={showCreateProductModal}
         onClose={() => setShowCreateProductModal(false)}

@@ -1,118 +1,142 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import IndustrySectorSelector from '../billing/IndustrySectorSelector';
+import type { Supplier } from '../../types/payables';
 
 interface CreateSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editingSupplier?: Supplier | null;
 }
 
-export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: CreateSupplierModalProps) {
+const formSectionClasses = "bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700/50";
+const inputClasses = "mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
+const labelClasses = "block text-sm font-medium text-gray-300";
+const sectionTitleClasses = "text-base font-medium text-white mb-4";
+
+export default function CreateSupplierModal({ isOpen, onClose, onSuccess, editingSupplier }: CreateSupplierModalProps) {
   const [formData, setFormData] = useState({
     business_name: '',
     commercial_name: '',
     tax_id: '',
-    email: '',
-    phone: '',
-    address: '',
+    industry_sector: '',
+    website: '',
+    street: '',
+    street_number: '',
+    city: '',
+    state: '',
+    postal_code: '',
     country: 'DO',
+    phone: '',
+    email: '',
     contact_name: '',
     contact_position: '',
     contact_phone: '',
-    payment_term_id: '',
+    invoice_type: '',
+    payment_terms: '',
+    preferred_currency: 'DOP',
     credit_limit: 0,
-    bank_name: '',
-    bank_account_type: '',
-    bank_account_number: '',
     notes: '',
     status: 'active' as const
   });
 
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [paymentTerms, setPaymentTerms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
-    if (isOpen) {
-      loadCategories();
-      loadPaymentTerms();
+    if (editingSupplier) {
+      // Parse address into components
+      const addressParts = editingSupplier.address?.split(',').map(part => part.trim()) || [];
+      const [streetFull = '', city = '', state = ''] = addressParts;
+      const [street = '', streetNumber = ''] = streetFull.split(' ').reduce((acc, part, i) => {
+        if (i === 0) acc[0] = part;
+        else if (/^\d+$/.test(part)) acc[1] = part;
+        else acc[0] += ' ' + part;
+        return acc;
+      }, ['', '']);
+
+      setFormData({
+        business_name: editingSupplier.full_name || '',
+        commercial_name: editingSupplier.commercial_name || '',
+        tax_id: editingSupplier.identification_number || '',
+        industry_sector: editingSupplier.industry_sector || '',
+        website: editingSupplier.website || '',
+        street: street,
+        street_number: streetNumber,
+        city: city,
+        state: state,
+        postal_code: editingSupplier.postal_code || '',
+        country: editingSupplier.country || 'DO',
+        phone: editingSupplier.phone || '',
+        email: editingSupplier.email || '',
+        contact_name: editingSupplier.contact_name || '',
+        contact_position: editingSupplier.contact_position || '',
+        contact_phone: editingSupplier.contact_phone || '',
+        invoice_type: editingSupplier.invoice_type || '',
+        payment_terms: editingSupplier.payment_terms || '',
+        preferred_currency: editingSupplier.preferred_currency || 'DOP',
+        credit_limit: editingSupplier.credit_limit || 0,
+        notes: editingSupplier.notes || '',
+        status: editingSupplier.status as 'active' | 'inactive'
+      });
     }
-  }, [isOpen]);
+  }, [editingSupplier]);
 
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('supplier_categories')
-        .select('*')
-        .order('name');
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
+  const [loading, setLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [selectedSector, setSelectedSector] = useState('');
+  const [selectedSubsector, setSelectedSubsector] = useState('');
 
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const loadPaymentTerms = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_terms')
-        .select('*')
-        .eq('is_active', true)
-        .order('days');
-
-      if (error) throw error;
-      setPaymentTerms(data || []);
-    } catch (error) {
-      console.error('Error loading payment terms:', error);
-    }
+  const handleSectorChange = (sector: string, subsector: string) => {
+    setSelectedSector(sector);
+    setSelectedSubsector(subsector);
+    setFormData({
+      ...formData,
+      industry_sector: `${sector}${subsector ? ` - ${subsector}` : ''}`
+    });
   };
 
   const validateForm = (): boolean => {
-    const errors: string[] = [];
+    const newErrors: Partial<Record<keyof typeof formData, string>> = {};
 
     // Required fields
-    if (!formData.business_name) errors.push('La razón social es requerida');
-    if (!formData.tax_id) errors.push('El RNC es requerido');
-    if (!formData.email) errors.push('El email es requerido');
-    if (!formData.phone) errors.push('El teléfono es requerido');
-    if (!formData.address) errors.push('La dirección es requerida');
+    if (!formData.business_name) newErrors.business_name = 'La razón social es requerida';
+    if (!formData.tax_id) newErrors.tax_id = 'El RNC es requerido';
+    if (!formData.phone) newErrors.phone = 'El teléfono es requerido';
+    if (!formData.email) newErrors.email = 'El email es requerido';
+    if (!formData.street) newErrors.street = 'La dirección es requerida';
+    if (!formData.city) newErrors.city = 'La ciudad es requerida';
+    if (!formData.state) newErrors.state = 'La provincia es requerida';
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
-      errors.push('El formato del email es inválido');
+      newErrors.email = 'El formato del email es inválido';
     }
 
     // Phone validation
     const phoneRegex = /^\+?[\d\s-]{8,}$/;
     if (formData.phone && !phoneRegex.test(formData.phone)) {
-      errors.push('El formato del teléfono es inválido');
+      newErrors.phone = 'El formato del teléfono es inválido';
     }
 
-    // Tax ID validation (RNC - 9 or 11 digits)
+    // RNC validation (9 or 11 digits)
     const rncRegex = /^\d{9,11}$/;
     if (formData.tax_id && !rncRegex.test(formData.tax_id)) {
-      errors.push('El RNC debe tener entre 9 y 11 dígitos');
+      newErrors.tax_id = 'El RNC debe tener entre 9 y 11 dígitos';
     }
 
-    if (errors.length > 0) {
-      setError(errors.join('\n'));
-      return false;
-    }
-
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setGeneralError(null);
+
     if (!validateForm()) return;
     
     setLoading(true);
-    setError(null);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -121,41 +145,58 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
         throw new Error('No authenticated user found');
       }
 
-      // Create supplier
-      const { data: supplier, error: supplierError } = await supabase
-        .from('suppliers')
-        .insert([{
-          ...formData,
-          created_by: user.id
-        }])
-        .select()
-        .single();
+      const supplierData = {
+        type: 'corporate',
+        identification_number: formData.tax_id,
+        full_name: formData.business_name,
+        commercial_name: formData.commercial_name,
+        email: formData.email,
+        phone: formData.phone,
+        address: `${formData.street} ${formData.street_number}, ${formData.city}, ${formData.state}`,
+        postal_code: formData.postal_code,
+        country: formData.country,
+        website: formData.website,
+        industry_sector: formData.industry_sector,
+        contact_name: formData.contact_name,
+        contact_position: formData.contact_position,
+        contact_phone: formData.contact_phone,
+        invoice_type: formData.invoice_type,
+        payment_terms: formData.payment_terms,
+        preferred_currency: formData.preferred_currency,
+        credit_limit: formData.credit_limit,
+        notes: formData.notes,
+        status: formData.status,
+      };
 
-      if (supplierError) throw supplierError;
+      if (editingSupplier) {
+        // Update existing supplier
+        const { error: updateError } = await supabase
+          .from('suppliers')
+          .update({
+            ...supplierData,
+            updated_by: user.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingSupplier.id);
 
-      if (!supplier) throw new Error('Failed to create supplier');
+        if (updateError) throw updateError;
+      } else {
+        // Create new supplier
+        const { error: createError } = await supabase
+          .from('suppliers')
+          .insert([{
+            ...supplierData,
+            created_by: user.id
+          }]);
 
-      // If we have categories, create the relations
-      if (selectedCategories.length > 0) {
-        const categoryRelations = selectedCategories.map(categoryId => ({
-          supplier_id: supplier.id,
-          category_id: categoryId
-        }));
-
-        const { error: categoriesError } = await supabase
-          .from('supplier_categories_suppliers')
-          .insert(categoryRelations);
-
-        if (categoriesError) {
-          console.error('Error creating category relations:', categoriesError);
-        }
+        if (createError) throw createError;
       }
 
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error in supplier creation:', error);
-      setError(error instanceof Error ? error.message : 'Error creating supplier');
+      console.error('Error in supplier operation:', error);
+      setGeneralError(error instanceof Error ? error.message : 'Error processing supplier');
     } finally {
       setLoading(false);
     }
@@ -164,29 +205,42 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl my-8">
-        <div className="flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold">Nuevo Proveedor</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.15),transparent_50%)]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[radial-gradient(circle_at_50%_50%,rgba(2,137,85,0.2),transparent_50%)] blur-2xl"></div>
+      </div>
+
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-4xl my-8 border border-white/10 shadow-2xl">
+        <div className="absolute inset-0 rounded-lg pointer-events-none">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+        </div>
+
+        <div className="sticky top-0 flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg z-50">
+          <h2 className="text-lg font-semibold text-white">
+            {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
-          {error && (
-            <div className="mb-6 bg-red-50 p-4 rounded-md">
-              <p className="text-sm text-red-700 whitespace-pre-line">{error}</p>
+          {generalError && (
+            <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
+              <p className="text-sm text-red-400">{generalError}</p>
             </div>
           )}
 
           <div className="space-y-6">
-            {/* Basic Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
-              <div className="grid grid-cols-1 gap-4">
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información Básica</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="business_name" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="business_name" className={labelClasses}>
                     Razón Social *
                   </label>
                   <input
@@ -195,12 +249,15 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.business_name}
                     onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
+                  {errors.business_name && (
+                    <p className="mt-1 text-sm text-red-400">{errors.business_name}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label htmlFor="commercial_name" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="commercial_name" className={labelClasses}>
                     Nombre Comercial
                   </label>
                   <input
@@ -208,12 +265,12 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     id="commercial_name"
                     value={formData.commercial_name}
                     onChange={(e) => setFormData({ ...formData, commercial_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="tax_id" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="tax_id" className={labelClasses}>
                     RNC *
                   </label>
                   <input
@@ -222,18 +279,41 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.tax_id}
                     onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
+                  />
+                  {errors.tax_id && (
+                    <p className="mt-1 text-sm text-red-400">{errors.tax_id}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="website" className={labelClasses}>
+                    Sitio Web
+                  </label>
+                  <input
+                    type="url"
+                    id="website"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    className={inputClasses}
                   />
                 </div>
               </div>
+
+              <div className="mt-4">
+                <IndustrySectorSelector
+                  value={selectedSector}
+                  onChange={handleSectorChange}
+                  className="mb-4"
+                />
+              </div>
             </div>
 
-            {/* Contact Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de Contacto</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información de Contacto</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="email" className={labelClasses}>
                     Email *
                   </label>
                   <input
@@ -242,12 +322,15 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="phone" className={labelClasses}>
                     Teléfono *
                   </label>
                   <input
@@ -256,32 +339,90 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
+                  />
+                  {errors.phone && (
+                    <p className="mt-1 text-sm text-red-400">{errors.phone}</p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="street" className={labelClasses}>
+                      Calle *
+                    </label>
+                    <input
+                      type="text"
+                      id="street"
+                      required
+                      value={formData.street}
+                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                      className={inputClasses}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="street_number" className={labelClasses}>
+                      Número
+                    </label>
+                    <input
+                      type="text"
+                      id="street_number"
+                      value={formData.street_number}
+                      onChange={(e) => setFormData({ ...formData, street_number: e.target.value })}
+                      className={inputClasses}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="postal_code" className={labelClasses}>
+                      Código Postal
+                    </label>
+                    <input
+                      type="text"
+                      id="postal_code"
+                      value={formData.postal_code}
+                      onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                      className={inputClasses}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="city" className={labelClasses}>
+                    Ciudad *
+                  </label>
+                  <input
+                    type="text"
+                    id="city"
+                    required
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className={inputClasses}
                   />
                 </div>
 
-                <div className="md:col-span-2">
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                    Dirección *
+                <div>
+                  <label htmlFor="state" className={labelClasses}>
+                    Provincia *
                   </label>
-                  <textarea
-                    id="address"
+                  <input
+                    type="text"
+                    id="state"
                     required
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={3}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className={inputClasses}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Contact Person */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Persona de Contacto</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Contacto Principal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="contact_name" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="contact_name" className={labelClasses}>
                     Nombre
                   </label>
                   <input
@@ -289,12 +430,12 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     id="contact_name"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact_position" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="contact_position" className={labelClasses}>
                     Cargo
                   </label>
                   <input
@@ -302,12 +443,12 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     id="contact_position"
                     value={formData.contact_position}
                     onChange={(e) => setFormData({ ...formData, contact_position: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="contact_phone" className={labelClasses}>
                     Teléfono
                   </label>
                   <input
@@ -315,42 +456,61 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                     id="contact_phone"
                     value={formData.contact_phone}
                     onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className={inputClasses}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Payment Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de Pago</h3>
+            <div className={formSectionClasses}>
+              <h3 className={sectionTitleClasses}>Información de Facturación</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="payment_term_id" className="block text-sm font-medium text-gray-700">
-                    Términos de Pago
+                  <label htmlFor="invoice_type" className={labelClasses}>
+                    Tipo de Comprobante *
                   </label>
                   <select
-                    id="payment_term_id"
-                    value={formData.payment_term_id}
-                    onChange={(e) => setFormData({ ...formData, payment_term_id: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    id="invoice_type"
+                    required
+                    value={formData.invoice_type}
+                    onChange={(e) => setFormData({ ...formData, invoice_type: e.target.value })}
+                    className={inputClasses}
                   >
-                    <option value="">Seleccione un término</option>
-                    {paymentTerms.map((term) => (
-                      <option key={term.id} value={term.id}>
-                        {term.name} ({term.days} días)
-                      </option>
-                    ))}
+                    <option value="">Seleccione un tipo</option>
+                    <option value="B01">Factura de Crédito Fiscal (B01)</option>
+                    <option value="B02">Factura de Consumo (B02)</option>
+                    <option value="B14">Factura Gubernamental (B14)</option>
+                    <option value="B15">Factura para Exportaciones (B15)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="credit_limit" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="payment_terms" className={labelClasses}>
+                    Condiciones de Pago *
+                  </label>
+                  <select
+                    id="payment_terms"
+                    required
+                    value={formData.payment_terms}
+                    onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
+                    className={inputClasses}
+                  >
+                    <option value="">Seleccione condición</option>
+                    <option value="contado">Contado</option>
+                    <option value="15">15 días</option>
+                    <option value="30">30 días</option>
+                    <option value="45">45 días</option>
+                    <option value="60">60 días</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="credit_limit" className={labelClasses}>
                     Límite de Crédito
                   </label>
                   <div className="mt-1 relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">RD$</span>
+                      <span className="text-gray-400 sm:text-sm">RD$</span>
                     </div>
                     <input
                       type="number"
@@ -359,90 +519,15 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                       step="0.01"
                       value={formData.credit_limit}
                       onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
-                      className="block w-full pl-12 pr-12 border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className={`${inputClasses} pl-12`}
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Bank Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Bancaria</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="bank_name" className="block text-sm font-medium text-gray-700">
-                    Banco
-                  </label>
-                  <input
-                    type="text"
-                    id="bank_name"
-                    value={formData.bank_name}
-                    onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="bank_account_type" className="block text-sm font-medium text-gray-700">
-                    Tipo de Cuenta
-                  </label>
-                  <select
-                    id="bank_account_type"
-                    value={formData.bank_account_type}
-                    onChange={(e) => setFormData({ ...formData, bank_account_type: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  >
-                    <option value="">Seleccione un tipo</option>
-                    <option value="savings">Ahorros</option>
-                    <option value="checking">Corriente</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="bank_account_number" className="block text-sm font-medium text-gray-700">
-                    Número de Cuenta
-                  </label>
-                  <input
-                    type="text"
-                    id="bank_account_number"
-                    value={formData.bank_account_number}
-                    onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Categories */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Categorías</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {categories.map((category) => (
-                    <label key={category.id} className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategories.includes(category.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedCategories([...selectedCategories, category.id]);
-                          } else {
-                            setSelectedCategories(selectedCategories.filter(id => id !== category.id));
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{category.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            <div className={formSectionClasses}>
+              <label htmlFor="notes" className={labelClasses}>
                 Notas
               </label>
               <textarea
@@ -450,7 +535,7 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                className={inputClasses}
               />
             </div>
           </div>
@@ -459,16 +544,16 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
             >
-              {loading ? 'Guardando...' : 'Crear Proveedor'}
+              {loading ? 'Guardando...' : editingSupplier ? 'Guardar Cambios' : 'Crear Proveedor'}
             </button>
           </div>
         </form>

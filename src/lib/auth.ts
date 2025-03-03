@@ -1,41 +1,140 @@
 import { supabase } from './supabase';
 
-export interface LogoutResult {
+interface AuthResult {
   success: boolean;
-  message: string;
+  data?: any;
+  error?: {
+    code: string;
+    message: string;
+  };
+  message?: string;
 }
 
-export async function logout(): Promise<LogoutResult> {
+// Login function
+export const login = async (email: string, password: string): Promise<AuthResult> => {
   try {
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
+    const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (signInError) {
+      throw signInError;
+    }
+
+    if (!session?.user) {
+      throw new Error('No user returned from login');
+    }
+
+    // Get profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      await supabase.auth.signOut();
       return {
         success: false,
-        message: 'No active session found'
+        error: {
+          code: 'profile_error',
+          message: 'Error getting user profile'
+        }
       };
     }
 
-    // Perform logout
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      throw error;
+    // Update last login
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ 
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', session.user.id);
+
+    if (updateError) {
+      console.error('Error updating last login:', updateError);
     }
 
-    // Clear any local storage items related to auth
-    localStorage.removeItem('supabase.auth.token');
-    
     return {
       success: true,
-      message: 'Successfully logged out'
+      data: {
+        user: session.user,
+        session
+      }
+    };
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      success: false,
+      error: {
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    };
+  }
+};
+
+// Logout function
+export const logout = async (): Promise<AuthResult> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: 'Logged out successfully'
     };
   } catch (error) {
     console.error('Logout error:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'An error occurred during logout'
+      error: {
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error al cerrar sesión'
+      }
     };
   }
-}
+};
+
+// Get current user's profile
+export const getCurrentProfile = async (): Promise<AuthResult> => {
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) throw userError;
+    if (!user) throw new Error('No authenticated user');
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      throw profileError;
+    }
+
+    if (!profile) {
+      console.error('No profile found');
+      throw new Error('Profile not found');
+    }
+
+    return {
+      success: true,
+      data: profile
+    };
+  } catch (error) {
+    console.error('Error getting current profile:', error);
+    return {
+      success: false,
+      error: {
+        code: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : 'Error getting profile'
+      }
+    };
+  }
+};

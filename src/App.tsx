@@ -6,6 +6,8 @@ import Dashboard from './components/Dashboard';
 import InventoryList from './components/inventory/InventoryList';
 import CustomerList from './components/customers/CustomerList';
 import InvoiceList from './components/billing/InvoiceList';
+import QuoteList from './components/billing/QuoteList';
+import NCFSequenceList from './components/billing/NCFSequenceList';
 import FinanceOverview from './components/finance/FinanceOverview';
 import ComplianceOverview from './components/compliance/ComplianceOverview';
 import PayablesList from './components/payables/PayablesList';
@@ -13,8 +15,11 @@ import ExpenseList from './components/payables/ExpenseList';
 import ProfilePage from './components/profile/ProfilePage';
 import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
+import RawMaterialList from './components/inventory/RawMaterialList';
+import PurchaseList from './components/purchases/PurchaseList';
+import SupplierList from './components/suppliers/SupplierList';
 
-function App() {
+export default function App() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -72,6 +77,16 @@ function App() {
           )
         } />
 
+        <Route path="/materias-primas" element={
+          user ? (
+            <Layout>
+              <RawMaterialList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
         <Route path="/clientes" element={
           user ? (
             <Layout>
@@ -86,6 +101,26 @@ function App() {
           user ? (
             <Layout>
               <InvoiceList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/facturacion/cotizaciones" element={
+          user ? (
+            <Layout>
+              <QuoteList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/facturacion/secuencias" element={
+          user ? (
+            <Layout>
+              <NCFSequenceList />
             </Layout>
           ) : (
             <Navigate to="/login" replace />
@@ -131,6 +166,26 @@ function App() {
             <Navigate to="/login" replace />
           )
         } />
+
+        <Route path="/compras" element={
+          user ? (
+            <Layout>
+              <PurchaseList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/suplidores" element={
+          user ? (
+            <Layout>
+              <SupplierList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
         
         <Route path="/" element={
           <Navigate to={user ? "/dashboard" : "/login"} replace />
@@ -139,5 +194,3 @@ function App() {
     </Router>
   );
 }
-
-export default App;

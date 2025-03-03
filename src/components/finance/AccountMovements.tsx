@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { financeAPI } from '../../lib/api/finance';
-import { billingAPI } from '../../lib/api/billing';
-import type { AccountMovement, Invoice } from '../../types/billing';
-import { ArrowUpRight, ArrowDownLeft, Eye } from 'lucide-react';
-import InvoiceViewerModal from '../billing/InvoiceViewerModal';
+import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 interface AccountMovementsProps {
   accountId: string;
 }
 
 export default function AccountMovements({ accountId }: AccountMovementsProps) {
-  const [movements, setMovements] = useState<AccountMovement[]>([]);
+  const [movements, setMovements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
@@ -47,16 +44,16 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-red-600">{error}</div>
+      <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400">
+        {error}
       </div>
     );
   }
@@ -76,10 +73,10 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-medium">Movimientos de Cuenta</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-lg font-medium text-white">Movimientos de Cuenta</h3>
+          <p className="text-sm text-gray-400 mt-1">
             Balance Actual: {' '}
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-white">
               {new Intl.NumberFormat('es-DO', {
                 style: 'currency',
                 currency: 'DOP'
@@ -89,68 +86,68 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
         </div>
         <div className="flex space-x-4">
           <div>
-            <label htmlFor="startDate" className="block text-sm text-gray-500">Desde</label>
+            <label htmlFor="startDate" className="block text-sm text-gray-400">Desde</label>
             <input
               type="date"
               id="startDate"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>
           <div>
-            <label htmlFor="endDate" className="block text-sm text-gray-500">Hasta</label>
+            <label htmlFor="endDate" className="block text-sm text-gray-400">Hasta</label>
             <input
               type="date"
               id="endDate"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-white/10">
+          <thead className="bg-gray-900/50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Fecha
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Descripción
               </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Débito
               </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Crédito
               </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Balance
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-white/10 bg-gray-800/30">
             {movementsWithBalance.map((movement) => (
-              <tr key={movement.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <tr key={movement.id} className="hover:bg-gray-700/30">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                   {new Date(movement.date).toLocaleDateString()}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
+                <td className="px-6 py-4 text-sm text-gray-300">
                   <div className="flex items-center">
                     {movement.type === 'debit' ? (
-                      <ArrowUpRight className="h-4 w-4 text-red-500 mr-2" />
+                      <ArrowUpRight className="h-4 w-4 text-red-400 mr-2" />
                     ) : (
-                      <ArrowDownLeft className="h-4 w-4 text-green-500 mr-2" />
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-400 mr-2" />
                     )}
                     {movement.description}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'debit' ? (
-                    <span className="text-red-600">
+                    <span className="text-red-400">
                       {new Intl.NumberFormat('es-DO', {
                         style: 'currency',
                         currency: 'DOP'
@@ -160,7 +157,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'credit' ? (
-                    <span className="text-green-600">
+                    <span className="text-emerald-400">
                       {new Intl.NumberFormat('es-DO', {
                         style: 'currency',
                         currency: 'DOP'
@@ -168,7 +165,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
                     </span>
                   ) : ''}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-white">
                   {new Intl.NumberFormat('es-DO', {
                     style: 'currency',
                     currency: 'DOP'
