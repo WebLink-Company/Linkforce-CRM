@@ -112,30 +112,24 @@ export default function AccountMovements({ accountId, dateRange, onDateRangeChan
         <table className="min-w-full divide-y divide-white/10">
           <thead className="bg-gray-900/50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Fecha
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Descripción
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Débito
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Crédito
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Balance
-              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Fecha</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Descripción</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Débito</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Crédito</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-gray-800/30">
             {movementsWithBalance.map((movement) => (
               <tr key={movement.id} className="hover:bg-gray-700/30">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                  {new Date(movement.date).toLocaleDateString()}
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
+                  {new Date(movement.date).toLocaleDateString('es-DO', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-300">
+                <td className="px-4 py-4 text-sm text-gray-300">
                   <div className="flex items-center">
                     {movement.type === 'debit' ? (
                       <ArrowUpRight className="h-4 w-4 text-red-400 mr-2" />
@@ -144,8 +138,13 @@ export default function AccountMovements({ accountId, dateRange, onDateRangeChan
                     )}
                     {movement.description}
                   </div>
+                  {movement.category && (
+                    <span className="text-xs text-gray-400 ml-6">
+                      Categoría: {movement.category}
+                    </span>
+                  )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'debit' ? (
                     <span className="text-red-400">
                       {new Intl.NumberFormat('es-DO', {
@@ -155,7 +154,7 @@ export default function AccountMovements({ accountId, dateRange, onDateRangeChan
                     </span>
                   ) : ''}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'credit' ? (
                     <span className="text-emerald-400">
                       {new Intl.NumberFormat('es-DO', {
@@ -165,7 +164,7 @@ export default function AccountMovements({ accountId, dateRange, onDateRangeChan
                     </span>
                   ) : ''}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-white">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-medium text-white">
                   {new Intl.NumberFormat('es-DO', {
                     style: 'currency',
                     currency: 'DOP'
