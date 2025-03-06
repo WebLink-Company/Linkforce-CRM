@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { AlertTriangle, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { financeAPI } from '../../lib/api/finance';
-import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 interface AccountMovementsProps {
   accountId: string;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
-export default function AccountMovements({ accountId }: AccountMovementsProps) {
-  const [movements, setMovements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
+export default function AccountMovements({ accountId, dateRange, onDateRangeChange }: AccountMovementsProps) {
+  const [movements, setMovements] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (accountId) {
       loadMovements();
     }
@@ -25,7 +26,6 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
     setLoading(true);
     setError(null);
     try {
-      console.log('Loading movements for account:', accountId);
       const { data, error } = await financeAPI.getAccountMovements(
         accountId,
         dateRange.startDate,
@@ -91,7 +91,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
               type="date"
               id="startDate"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+              onChange={(e) => onDateRangeChange({ ...dateRange, startDate: e.target.value })}
               className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>
@@ -101,7 +101,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
               type="date"
               id="endDate"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+              onChange={(e) => onDateRangeChange({ ...dateRange, endDate: e.target.value })}
               className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User, UserCircle2, ChevronRight, Building2, ShoppingCart, ListOrdered } from 'lucide-react';
+import { Menu, Package, FileText, DollarSign, Users, Shield, BookOpen, LogOut, Receipt, CreditCard, LayoutDashboard, ChevronDown, Settings, User, UserCircle2, ChevronRight, Building2, ShoppingCart, ListOrdered, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../lib/auth';
 import { useAuth } from '../hooks/useAuth';
@@ -13,6 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isMenuPinned, setIsMenuPinned] = useState(false);
   const [showPurchaseSubmenu, setShowPurchaseSubmenu] = useState(false);
   const [showBillingSubmenu, setShowBillingSubmenu] = useState(false);
+  const [showFinanceSubmenu, setShowFinanceSubmenu] = useState(false);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -234,6 +235,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </li>
                       <li>
+                        <Link to="/compras/productos" className={linkClasses('/compras/productos')}>
+                          <Package className="h-4 w-4" />
+                          <span>Productos de Compra</span>
+                        </Link>
+                      </li>
+                      <li>
                         <Link to="/suplidores" className={linkClasses('/suplidores')}>
                           <Building2 className="h-4 w-4" />
                           <span>Suplidores</span>
@@ -244,18 +251,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </li>
               
+              {/* Finance Menu */}
               <li>
-                <Link to="/finanzas" className={linkClasses('/finanzas')}>
-                  <DollarSign className="h-5 w-5" />
-                  <span>Finanzas</span>
-                </Link>
-              </li>
-
-              <li>
-                <Link to="/cuentas-por-pagar" className={linkClasses('/cuentas-por-pagar')}>
-                  <CreditCard className="h-5 w-5" />
-                  <span>Cuentas por Pagar</span>
-                </Link>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFinanceSubmenu(!showFinanceSubmenu)}
+                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-gray-300 hover:bg-white/5 hover:text-white ${
+                      ['/finanzas', '/cuentas-por-pagar'].includes(location.pathname) ? 'bg-emerald-500/20 text-emerald-300' : ''
+                    }`}
+                  >
+                    <Wallet className="h-5 w-5" />
+                    <span>Finanzas</span>
+                    <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${showFinanceSubmenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showFinanceSubmenu && (
+                    <ul className="ml-6 mt-2 space-y-2">
+                      <li>
+                        <Link to="/finanzas" className={linkClasses('/finanzas')}>
+                          <DollarSign className="h-4 w-4" />
+                          <span>Contabilidad</span>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/cuentas-por-pagar" className={linkClasses('/cuentas-por-pagar')}>
+                          <CreditCard className="h-4 w-4" />
+                          <span>Cuentas por Pagar</span>
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
+                </div>
               </li>
 
               <li>

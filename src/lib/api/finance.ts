@@ -38,7 +38,7 @@ class FinanceAPI extends BaseAPI {
       // First get the account ID from the code
       const { data: account, error: accountError } = await supabase
         .from('accounts')
-        .select('id')
+        .select('id, type')
         .eq('code', accountCode)
         .single();
 
@@ -51,6 +51,124 @@ class FinanceAPI extends BaseAPI {
         throw new Error('Account not found');
       }
 
+      // For expenses account (5000), get movements from approved expenses
+      if (accountCode === '5000') {
+        let query = supabase
+          .from('expenses')
+          .select(`
+            id,
+            number,
+            date,
+            description,
+            amount,
+            tax_amount,
+            total_amount,
+            category:expense_categories(name),
+            supplier:suppliers(business_name)
+          `)
+          .eq('status', 'approved');
+
+        if (startDate) {
+          query = query.gte('date', startDate);
+        }
+        if (endDate) {
+          query = query.lte('date', endDate);
+        }
+
+        const { data: expenses, error: expensesError } = await query;
+        if (expensesError) throw expensesError;
+
+        // Transform expenses into movements format
+        const movements = expenses?.map(expense => ({
+          id: expense.id,
+          date: expense.date,
+          description: `${expense.number} - ${expense.description} ${expense.supplier?.business_name ? `(${expense.supplier.business_name})` : ''}`,
+          type: 'debit' as const,
+          amount: expense.total_amount,
+          reference_type: 'expense',
+          reference_id: expense.id,
+          category: expense.category?.name
+        })) || [];
+
+        return { data: movements, error: null };
+      }
+
+      // For accounts payable (2100), get movements from purchase orders and payments
+      if (accountCode === '2100') {
+        // Get approved purchase orders
+        let poQuery = supabase
+          .from('purchase_orders')
+          .select(`
+            id,
+            number,
+            issue_date,
+            total_amount,
+            supplier:suppliers(business_name)
+          `)
+          .in('status', ['sent', 'confirmed', 'received']);
+
+        if (startDate) {
+          poQuery = poQuery.gte('issue_date', startDate);
+        }
+        if (endDate) {
+          poQuery = poQuery.lte('issue_date', endDate);
+        }
+
+        const { data: orders, error: ordersError } = await poQuery;
+        if (ordersError) throw ordersError;
+
+        // Get supplier payments
+        let paymentQuery = supabase
+          .from('supplier_payments')
+          .select(`
+            id,
+            payment_date,
+            amount,
+            invoice:supplier_invoices(
+              number,
+              supplier:suppliers(business_name)
+            )
+          `);
+
+        if (startDate) {
+          paymentQuery = paymentQuery.gte('payment_date', startDate);
+        }
+        if (endDate) {
+          paymentQuery = paymentQuery.lte('payment_date', endDate);
+        }
+
+        const { data: payments, error: paymentsError } = await paymentQuery;
+        if (paymentsError) throw paymentsError;
+
+        // Combine and transform movements
+        const movements = [
+          // Purchase order movements (credits - increase liability)
+          ...(orders?.map(order => ({
+            id: order.id,
+            date: order.issue_date,
+            description: `Orden de Compra ${order.number} - ${order.supplier?.business_name}`,
+            type: 'credit' as const,
+            amount: order.total_amount,
+            reference_type: 'purchase_order',
+            reference_id: order.id
+          })) || []),
+
+          // Payment movements (debits - decrease liability)
+          ...(payments?.map(payment => ({
+            id: payment.id,
+            date: payment.payment_date,
+            description: `Pago factura ${payment.invoice?.number} - ${payment.invoice?.supplier?.business_name}`,
+            type: 'debit' as const,
+            amount: payment.amount,
+            reference_type: 'supplier_payment',
+            reference_id: payment.id
+          })) || [])
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return { data: movements, error: null };
+      }
+
+      // For other accounts, get from account_movements table
       let query = supabase
         .from('account_movements')
         .select(`
@@ -82,10 +200,63 @@ class FinanceAPI extends BaseAPI {
     try {
       console.log('Getting balance for account:', accountCode, 'as of:', asOfDate);
       
-      // First get the account ID from the code
+      // For expenses account (5000), calculate from approved expenses
+      if (accountCode === '5000') {
+        const { data: expenses, error: expensesError } = await supabase
+          .from('expenses')
+          .select('total_amount')
+          .eq('status', 'approved')
+          .lte('date', asOfDate);
+
+        if (expensesError) throw expensesError;
+
+        const balance = expenses?.reduce((sum, exp) => sum + exp.total_amount, 0) || 0;
+
+        return {
+          data: {
+            balance,
+            as_of_date: asOfDate
+          },
+          error: null
+        };
+      }
+
+      // For accounts payable (2100), calculate from purchase orders and payments
+      if (accountCode === '2100') {
+        // Get total from approved purchase orders
+        const { data: orders, error: ordersError } = await supabase
+          .from('purchase_orders')
+          .select('total_amount')
+          .in('status', ['sent', 'confirmed', 'received'])
+          .lte('issue_date', asOfDate);
+
+        if (ordersError) throw ordersError;
+
+        // Get total payments
+        const { data: payments, error: paymentsError } = await supabase
+          .from('supplier_payments')
+          .select('amount')
+          .lte('payment_date', asOfDate);
+
+        if (paymentsError) throw paymentsError;
+
+        const totalOrders = orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+        const totalPayments = payments?.reduce((sum, payment) => sum + payment.amount, 0) || 0;
+        const balance = totalOrders - totalPayments;
+
+        return {
+          data: {
+            balance,
+            as_of_date: asOfDate
+          },
+          error: null
+        };
+      }
+
+      // For other accounts, use the account_balance function
       const { data: account, error: accountError } = await supabase
         .from('accounts')
-        .select('id, type')
+        .select('id')
         .eq('code', accountCode)
         .single();
 
@@ -190,6 +361,18 @@ class FinanceAPI extends BaseAPI {
         p_end_date: endDate
       });
     return { data, error };
+  }
+
+  // Get pending payables
+  async getPendingPayables() {
+    try {
+      const { data, error } = await supabase.rpc('get_pending_payables');
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error getting pending payables:', error);
+      return { data: null, error };
+    }
   }
 }
 

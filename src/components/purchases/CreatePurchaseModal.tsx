@@ -12,7 +12,6 @@ interface CreatePurchaseModalProps {
 
 export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: CreatePurchaseModalProps) {
   const [formData, setFormData] = useState({
-    number: '', // Added manual order number field
     supplier_id: '',
     issue_date: new Date().toISOString().split('T')[0],
     expected_date: '',
@@ -112,16 +111,24 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
         throw new Error('No authenticated user found');
       }
 
-      // Validate order number format if provided
-      if (formData.number && !/^PO-\d{4}-\d{6}$/.test(formData.number)) {
-        throw new Error('El número de orden debe tener el formato: PO-YYYY-XXXXXX');
+      // Get the next purchase order number using the database function
+      const { data: number, error: numberError } = await supabase
+        .rpc('generate_po_number');
+
+      if (numberError) {
+        console.error('Error generating purchase order number:', numberError);
+        throw new Error('Error al generar el número de orden de compra');
       }
 
-      // Create purchase order
+      if (!number) {
+        throw new Error('No se pudo generar el número de orden de compra');
+      }
+
+      // Create purchase order with the generated number
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert([{
-          number: formData.number || undefined, // Only send if provided
+          number,
           supplier_id: formData.supplier_id,
           issue_date: formData.issue_date,
           expected_date: formData.expected_date || null,
@@ -243,26 +250,6 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
             <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
               <h3 className="text-sm font-medium text-white">Información Básica</h3>
               
-              {/* Manual Order Number Field */}
-              <div>
-                <label htmlFor="number" className="block text-sm font-medium text-gray-300">
-                  Número de Orden (Opcional)
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    id="number"
-                    value={formData.number}
-                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                    placeholder="PO-YYYY-XXXXXX"
-                    className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
-                  />
-                  <p className="mt-1 text-sm text-gray-400">
-                    Formato: PO-YYYY-XXXXXX (se generará automáticamente si se deja en blanco)
-                  </p>
-                </div>
-              </div>
-
               <div>
                 <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
                   Proveedor *
