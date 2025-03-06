@@ -108,7 +108,7 @@ export default function LoginForm() {
         <div className="flex flex-col items-center">
           {/* Logo Image */}
           <img 
-            src="https://raw.githubusercontent.com/julioavantt/teacher_images/main/lf.png"
+            src="/img/LinkForce-logo-01.png"
             alt="LinkForce Logo"
             className="w-64 h-auto mb-4"
           />
