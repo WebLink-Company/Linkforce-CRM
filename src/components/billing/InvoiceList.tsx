@@ -649,42 +649,44 @@ export default function InvoiceList() {
           }}
         />
 
-        <InvoiceViewerModal
-          isOpen={showViewerModal}
-          onClose={() => {
-            setShowViewerModal(false);
-            setSelectedInvoice(null);
-          }}
-          invoice={selectedInvoice}
-          onSuccess={() => {
-            loadInvoices();
-            loadStats();
-          }}
-        />
-
         {selectedInvoice && (
-          <EditInvoiceModal
-            isOpen={showEditModal}
-            onClose={() => {
-              setShowEditModal(false);
-              setSelectedInvoice(null);
-            }}
-            onSuccess={() => {
-              loadInvoices();
-              loadStats();
-            }}
-            invoice={selectedInvoice}
-          />
-        )}
+          <>
+            <InvoiceViewerModal
+              isOpen={showViewerModal}
+              onClose={() => {
+                setShowViewerModal(false);
+                setSelectedInvoice(null);
+              }}
+              invoice={selectedInvoice}
+              onSuccess={() => {
+                loadInvoices();
+                loadStats();
+              }}
+            />
 
-        <SendEmailModal
-          isOpen={showEmailModal}
-          onClose={() => {
-            setShowEmailModal(false);
-            setSelectedInvoice(null);
-          }}
-          invoice={selectedInvoice!}
-        />
+            <EditInvoiceModal
+              isOpen={showEditModal}
+              onClose={() => {
+                setShowEditModal(false);
+                setSelectedInvoice(null);
+              }}
+              onSuccess={() => {
+                loadInvoices();
+                loadStats();
+              }}
+              invoice={selectedInvoice}
+            />
+
+            <SendEmailModal
+              isOpen={showEmailModal}
+              onClose={() => {
+                setShowEmailModal(false);
+                setSelectedInvoice(null);
+              }}
+              invoice={selectedInvoice}
+            />
+          </>
+        )}
       </div>
     </div>
   );
