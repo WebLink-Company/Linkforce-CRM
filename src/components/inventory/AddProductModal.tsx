@@ -19,6 +19,7 @@ const UNIT_MEASURES = [
   { value: 'u', label: 'Unidades' },
   { value: 'pz', label: 'Piezas' },
   { value: 'cj', label: 'Cajas' },
+  { value: 'lb', label: 'Libras' },
 ];
 
 const initialFormData = {
