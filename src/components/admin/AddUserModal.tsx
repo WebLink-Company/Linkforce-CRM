@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { usersAPI } from '../../lib/api/users';
 import type { Usuario } from '../../types/auth';
 
 interface AddUserModalProps {
@@ -48,38 +48,33 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     setError(null);
 
     try {
-      // Create auth user
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            role: formData.role
-          }
-        }
-      });
+      // Check current user's role first
+      const currentRole = await usersAPI.getCurrentUserRole();
+      console.log('Current user role:', currentRole);
 
-      if (signUpError) throw signUpError;
-      if (!data.user) throw new Error('No user data returned');
-
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: data.user.id,
-          email: formData.email,
-          full_name: formData.fullName,
-          role: formData.role,
-          status: 'active'
-        }]);
-
-      if (profileError) {
-        // If profile creation fails, attempt to clean up auth user
-        await supabase.auth.admin.deleteUser(data.user.id);
-        throw profileError;
+      if (currentRole !== 'admin') {
+        throw new Error('No tiene permisos de administrador para realizar esta acción');
       }
 
+      console.log('Creating new user:', {
+        email: formData.email,
+        fullName: formData.fullName,
+        role: formData.role.toLowerCase()
+      });
+      
+      const { data, error } = await usersAPI.createUser(
+        formData.email,
+        formData.password,
+        formData.fullName,
+        formData.role.toLowerCase() // Ensure role is lowercase
+      );
+
+      if (error) {
+        console.error('User creation error:', error);
+        throw error;
+      }
+
+      console.log('User created successfully:', data);
       onSuccess();
       onClose();
     } catch (error) {

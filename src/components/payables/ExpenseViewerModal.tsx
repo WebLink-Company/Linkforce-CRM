@@ -89,17 +89,26 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-3xl">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">Gasto #{expense.number}</h2>
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+      <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-3xl border border-white/10 shadow-2xl">
+        {/* Glowing border effects */}
+        <div className="absolute inset-0 rounded-lg pointer-events-none">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+          <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent"></div>
+        </div>
+
+        {/* Fixed Header */}
+        <div className="flex justify-between items-center p-4 border-b border-white/10 bg-gray-900/95 backdrop-blur-sm rounded-t-lg z-10">
+          <h2 className="text-lg font-semibold text-white">Gasto #{expense.number}</h2>
           <div className="flex items-center space-x-2">
             {expense.status === 'pending' && (
               <>
                 <button
                   onClick={handleApprove}
                   disabled={loading}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                  className="btn btn-primary"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   {loading ? 'Procesando...' : 'Aprobar'}
@@ -107,7 +116,7 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
                 <button
                   onClick={handleReject}
                   disabled={loading}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                  className="btn btn-danger"
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Rechazar
@@ -116,50 +125,51 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
             )}
             <button
               onClick={handlePrint}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="btn btn-secondary"
             >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="p-4 bg-red-50">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="p-4 bg-red-500/20 border-b border-red-500/50">
+            <p className="text-sm text-red-400">{error}</p>
           </div>
         )}
 
-        <div className="p-6">
+        {/* Scrollable Content */}
+        <div className="p-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Basic Information */}
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Información General</h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                <h3 className="text-lg font-medium text-white mb-4">Información General</h3>
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10 space-y-4">
                   <div className="flex items-center">
                     <Calendar className="h-5 w-5 text-gray-400 mr-2" />
                     <div>
-                      <p className="text-sm text-gray-500">Fecha</p>
-                      <p className="font-medium">{formatDate(expense.date)}</p>
+                      <p className="text-sm text-gray-400">Fecha</p>
+                      <p className="font-medium text-white">{formatDate(expense.date)}</p>
                     </div>
                   </div>
                   <div className="flex items-center">
                     <Tag className="h-5 w-5 text-gray-400 mr-2" />
                     <div>
-                      <p className="text-sm text-gray-500">Categoría</p>
-                      <p className="font-medium">{expense.category?.name}</p>
+                      <p className="text-sm text-gray-400">Categoría</p>
+                      <p className="font-medium text-white">{expense.category?.name}</p>
                     </div>
                   </div>
                   {expense.supplier && (
                     <div className="flex items-center">
                       <User className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
-                        <p className="text-sm text-gray-500">Proveedor</p>
-                        <p className="font-medium">{expense.supplier.business_name}</p>
+                        <p className="text-sm text-gray-400">Proveedor</p>
+                        <p className="font-medium text-white">{expense.supplier.business_name}</p>
                       </div>
                     </div>
                   )}
@@ -167,9 +177,9 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Descripción</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700">{expense.description}</p>
+                <h3 className="text-lg font-medium text-white mb-4">Descripción</h3>
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+                  <p className="text-gray-300">{expense.description}</p>
                 </div>
               </div>
             </div>
@@ -177,40 +187,40 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
             {/* Amounts and Status */}
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Montos</h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                <h3 className="text-lg font-medium text-white mb-4">Montos</h3>
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10 space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Subtotal:</span>
-                    <span className="font-medium">{formatCurrency(expense.amount)}</span>
+                    <span className="text-sm text-gray-400">Subtotal:</span>
+                    <span className="font-medium text-white">{formatCurrency(expense.amount)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">ITBIS (18%):</span>
-                    <span className="font-medium">{formatCurrency(expense.tax_amount)}</span>
+                    <span className="text-sm text-gray-400">ITBIS:</span>
+                    <span className="font-medium text-white">{formatCurrency(expense.tax_amount)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-base font-medium">Total:</span>
-                    <span className="text-lg font-bold">{formatCurrency(expense.total_amount)}</span>
+                  <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                    <span className="text-base font-medium text-white">Total:</span>
+                    <span className="text-lg font-bold text-white">{formatCurrency(expense.total_amount)}</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Estado</h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                <h3 className="text-lg font-medium text-white mb-4">Estado</h3>
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10 space-y-4">
                   <div className="flex items-center">
                     {expense.status === 'approved' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                      <CheckCircle className="h-5 w-5 text-emerald-400 mr-2" />
                     ) : expense.status === 'rejected' ? (
-                      <XCircle className="h-5 w-5 text-red-500 mr-2" />
+                      <XCircle className="h-5 w-5 text-red-400 mr-2" />
                     ) : (
-                      <FileText className="h-5 w-5 text-yellow-500 mr-2" />
+                      <FileText className="h-5 w-5 text-yellow-400 mr-2" />
                     )}
                     <div>
-                      <p className="text-sm text-gray-500">Estado Actual</p>
+                      <p className="text-sm text-gray-400">Estado Actual</p>
                       <p className={`font-medium ${
-                        expense.status === 'approved' ? 'text-green-600' :
-                        expense.status === 'rejected' ? 'text-red-600' :
-                        'text-yellow-600'
+                        expense.status === 'approved' ? 'text-emerald-400' :
+                        expense.status === 'rejected' ? 'text-red-400' :
+                        'text-yellow-400'
                       }`}>
                         {expense.status === 'approved' ? 'Aprobado' :
                          expense.status === 'rejected' ? 'Rechazado' :
@@ -223,10 +233,10 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
                     <div className="flex items-center">
                       <DollarSign className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
-                        <p className="text-sm text-gray-500">Método de Pago</p>
-                        <p className="font-medium">{expense.payment_method.name}</p>
+                        <p className="text-sm text-gray-400">Método de Pago</p>
+                        <p className="font-medium text-white">{expense.payment_method.name}</p>
                         {expense.reference_number && (
-                          <p className="text-sm text-gray-500">Ref: {expense.reference_number}</p>
+                          <p className="text-sm text-gray-400">Ref: {expense.reference_number}</p>
                         )}
                       </div>
                     </div>
@@ -236,9 +246,9 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
                     <div className="flex items-center">
                       <User className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
-                        <p className="text-sm text-gray-500">Aprobado por</p>
-                        <p className="font-medium">{expense.approved_by}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-400">Aprobado por</p>
+                        <p className="font-medium text-white">{expense.approved_by}</p>
+                        <p className="text-sm text-gray-400">
                           {expense.approved_at && formatDate(expense.approved_at)}
                         </p>
                       </div>
@@ -252,9 +262,41 @@ export default function ExpenseViewerModal({ isOpen, onClose, expense, onSuccess
           {/* Notes */}
           {expense.notes && (
             <div className="mt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Notas</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{expense.notes}</p>
+              <h3 className="text-lg font-medium text-white mb-4">Notas</h3>
+              <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+                <p className="text-gray-300 whitespace-pre-wrap">{expense.notes}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {expense.attachments && expense.attachments.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-medium text-white mb-4">Adjuntos</h3>
+              <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+                <ul className="divide-y divide-white/10">
+                  {expense.attachments.map((attachment) => (
+                    <li key={attachment.id} className="py-3 flex items-center justify-between">
+                      <div className="flex items-center">
+                        <FileText className="h-5 w-5 text-gray-400 mr-2" />
+                        <div>
+                          <p className="font-medium text-white">{attachment.file_name}</p>
+                          <p className="text-sm text-gray-400">
+                            {(attachment.file_size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          // Handle file download
+                        }}
+                        className="text-emerald-400 hover:text-emerald-300"
+                      >
+                        Descargar
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}

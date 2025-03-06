@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Building2, Phone, Mail as MailIcon, MapPin } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Invoice, InvoiceItem } from '../../types/billing';
 
@@ -14,6 +14,7 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
   const [formData, setFormData] = useState({
     notes: invoice.notes || '',
     due_date: invoice.due_date,
+    issue_date: invoice.issue_date,
   });
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -26,6 +27,7 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
       setFormData({
         notes: invoice.notes || '',
         due_date: invoice.due_date,
+        issue_date: invoice.issue_date,
       });
       
       // Initialize items with existing invoice items
@@ -43,8 +45,6 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
           discount_amount: item.discount_amount,
           total_amount: item.total_amount
         })));
-      } else {
-        setItems([]);
       }
       
       loadProducts();
@@ -77,6 +77,7 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
         p_invoice_id: invoice.id,
         p_notes: formData.notes,
         p_due_date: formData.due_date,
+        p_issue_date: formData.issue_date,
         p_items: items
       });
 
@@ -164,39 +165,13 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
             <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
               <h3 className="text-base font-medium text-white mb-4">Información del Cliente</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-start space-x-2">
-                  <Building2 className="h-4 w-4 mt-1 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-400">Razón Social</p>
-                    <p className="font-medium text-white">{invoice.customer?.full_name}</p>
-                    {invoice.customer?.commercial_name && (
-                      <p className="text-sm text-gray-400">{invoice.customer.commercial_name}</p>
-                    )}
-                  </div>
+                <div>
+                  <p className="text-sm text-gray-400">Cliente</p>
+                  <p className="font-medium text-white">{invoice.customer?.full_name}</p>
                 </div>
-
-                <div className="flex items-start space-x-2">
-                  <MailIcon className="h-4 w-4 mt-1 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-400">Email</p>
-                    <p className="font-medium text-white">{invoice.customer?.email}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <MapPin className="h-4 w-4 mt-1 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-400">Dirección</p>
-                    <p className="font-medium text-white">{invoice.customer?.address}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <Phone className="h-4 w-4 mt-1 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-400">Teléfono</p>
-                    <p className="font-medium text-white">{invoice.customer?.phone}</p>
-                  </div>
+                <div>
+                  <p className="text-sm text-gray-400">RNC</p>
+                  <p className="font-medium text-white">{invoice.customer?.identification_number}</p>
                 </div>
               </div>
             </div>
@@ -206,12 +181,27 @@ export default function EditInvoiceModal({ isOpen, onClose, onSuccess, invoice }
               <h3 className="text-base font-medium text-white mb-4">Información de la Factura</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                  <label htmlFor="issue_date" className="block text-sm font-medium text-gray-300">
+                    Fecha de Emisión *
+                  </label>
+                  <input
+                    type="date"
+                    id="issue_date"
+                    required
+                    value={formData.issue_date}
+                    onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
+                    className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                  />
+                </div>
+
+                <div>
                   <label htmlFor="due_date" className="block text-sm font-medium text-gray-300">
-                    Fecha de Vencimiento
+                    Fecha de Vencimiento *
                   </label>
                   <input
                     type="date"
                     id="due_date"
+                    required
                     value={formData.due_date}
                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                     className="mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"

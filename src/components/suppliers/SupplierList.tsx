@@ -3,17 +3,21 @@ import { Building2, Search, Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit
 import { supabase } from '../../lib/supabase';
 import type { Supplier } from '../../types/payables';
 import CreateSupplierModal from './CreateSupplierModal';
+import RegularSupplierModal from './RegularSupplierModal';
 import SupplierViewerModal from './SupplierViewerModal';
 import { exportToCSV } from '../../utils/export';
+import SupplierTypeDialog from './SupplierTypeDialog';
 
 export default function SupplierList() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showRegularModal, setShowRegularModal] = useState(false);
   const [showViewerModal, setShowViewerModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
 
   useEffect(() => {
     loadSuppliers();
@@ -49,7 +53,11 @@ export default function SupplierList() {
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
-    setShowCreateModal(true);
+    if (supplier.type === 'corporate') {
+      setShowCreateModal(true);
+    } else {
+      setShowRegularModal(true);
+    }
   };
 
   const handleView = (supplier: Supplier) => {
@@ -73,9 +81,24 @@ export default function SupplierList() {
     }
   };
 
+  const handleTypeSelect = (type: 'regular' | 'corporate') => {
+    setShowTypeDialog(false);
+    if (type === 'regular') {
+      setShowRegularModal(true);
+    } else {
+      setShowCreateModal(true);
+    }
+  };
+
+  const handleModalClose = () => {
+    setShowCreateModal(false);
+    setShowRegularModal(false);
+    setSelectedSupplier(null);
+  };
+
   const filteredSuppliers = suppliers.filter(supplier =>
     supplier.business_name.toLowerCase().includes(search.toLowerCase()) ||
-    supplier.tax_id.includes(search)
+    supplier.tax_id?.includes(search)
   );
 
   if (loading) {
@@ -107,7 +130,7 @@ export default function SupplierList() {
             <button
               onClick={() => {
                 setSelectedSupplier(null);
-                setShowCreateModal(true);
+                setShowTypeDialog(true);
               }}
               className="btn btn-primary"
             >
@@ -155,10 +178,10 @@ export default function SupplierList() {
             <table className="min-w-full divide-y divide-white/5">
               <thead className="table-header">
                 <tr>
-                  <th scope="col" className="table-header th">RNC</th>
-                  <th scope="col" className="table-header th">Razón Social</th>
+                  <th scope="col" className="table-header th">RNC/Cédula</th>
+                  <th scope="col" className="table-header th">Nombre</th>
                   <th scope="col" className="table-header th">Teléfono</th>
-                  <th scope="col" className="table-header th">Email</th>
+                  <th scope="col" className="table-header th">Tipo</th>
                   <th scope="col" className="table-header th text-center">Estado</th>
                   <th scope="col" className="relative table-header th">
                     <span className="sr-only">Acciones</span>
@@ -168,10 +191,18 @@ export default function SupplierList() {
               <tbody className="divide-y divide-white/5">
                 {filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id} className="table-row">
-                    <td className="table-cell font-medium">{supplier.tax_id}</td>
+                    <td className="table-cell font-medium">{supplier.tax_id || '-'}</td>
                     <td className="table-cell">{supplier.business_name}</td>
-                    <td className="table-cell">{supplier.phone}</td>
-                    <td className="table-cell">{supplier.email}</td>
+                    <td className="table-cell">{supplier.phone || '-'}</td>
+                    <td className="table-cell">
+                      <span className={`status-badge ${
+                        supplier.type === 'corporate' 
+                          ? 'status-badge-info'
+                          : 'status-badge-success'
+                      }`}>
+                        {supplier.type === 'corporate' ? 'Empresarial' : 'Regular'}
+                      </span>
+                    </td>
                     <td className="table-cell text-center">
                       <span className={`status-badge ${
                         supplier.status === 'active' 
@@ -213,14 +244,23 @@ export default function SupplierList() {
           </div>
         </div>
 
+        <SupplierTypeDialog
+          isOpen={showTypeDialog}
+          onClose={() => setShowTypeDialog(false)}
+          onSelectType={handleTypeSelect}
+        />
+
         <CreateSupplierModal
           isOpen={showCreateModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            setSelectedSupplier(null);
-          }}
+          onClose={handleModalClose}
           onSuccess={loadSuppliers}
           editingSupplier={selectedSupplier}
+        />
+
+        <RegularSupplierModal
+          isOpen={showRegularModal}
+          onClose={handleModalClose}
+          onSuccess={loadSuppliers}
         />
 
         <SupplierViewerModal

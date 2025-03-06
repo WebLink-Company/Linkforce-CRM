@@ -24,6 +24,7 @@ export const getCurrentSchema = (): string => {
       console.log('🛠️ Defaulting to public schema in dev mode');
       return 'public';
     }
+
     // ✅ Production schema mapping
     if (hostname.includes('quimicinter')) {
       console.log('🌍 Using schema: quimicinter');
@@ -32,7 +33,6 @@ export const getCurrentSchema = (): string => {
     if (hostname.includes('qa')) {
       console.log('🌍 Using schema: qalinkforce');
       return 'qalinkforce';
-
     }
 
     console.log('🌍 Defaulting to public schema');
@@ -69,7 +69,7 @@ export const validateSchema = (schema: string): boolean => {
 };
 
 // ✅ Initialize Supabase client with the current schema
-export const supabase = createSupabaseClient(getCurrentSchema());
+const supabaseClient = createSupabaseClient(getCurrentSchema());
 
 // ✅ Function to update schema dynamically and recreate Supabase client
 export const updateSupabaseSchema = (schema: string): void => {
@@ -85,7 +85,14 @@ export const updateSupabaseSchema = (schema: string): void => {
     console.log('🛠️ Stored schema in localStorage:', schema);
   }
 
+  // ⚡ Create new client instance with updated schema
+  const newClient = createSupabaseClient(schema);
+  
   // ⚡ Update the exported supabase instance
-  Object.assign(supabase, createSupabaseClient(schema));
+  Object.assign(supabaseClient, newClient);
+  
   console.log('✅ Supabase client updated with new schema:', schema);
 };
+
+// Export the Supabase client instance
+export { supabaseClient as supabase };

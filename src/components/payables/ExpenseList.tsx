@@ -4,15 +4,17 @@ import { payablesAPI } from '../../lib/api/payables';
 import type { Expense } from '../../types/payables';
 import CreateExpenseModal from './CreateExpenseModal';
 import ExpenseViewerModal from './ExpenseViewerModal';
+import EditExpenseModal from './EditExpenseModal';
 import { exportToCSV } from '../../utils/export';
 
 export default function ExpenseList() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showViewerModal, setShowViewerModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     loadExpenses();
@@ -41,19 +43,26 @@ export default function ExpenseList() {
     setShowViewerModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('¿Está seguro que desea eliminar este gasto?')) {
-      try {
-        const { error } = await supabase
-          .from('expenses')
-          .delete()
-          .eq('id', id);
+  const handleEdit = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setShowEditModal(true);
+  };
 
-        if (error) throw error;
-        await loadExpenses();
-      } catch (error) {
-        console.error('Error deleting expense:', error);
-      }
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Está seguro que desea eliminar este gasto?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadExpenses();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
     }
   };
 
@@ -162,7 +171,7 @@ export default function ExpenseList() {
                         {expense.status === 'pending' && (
                           <>
                             <button
-                              onClick={() => handleView(expense)}
+                              onClick={() => handleEdit(expense)}
                               className="action-icon-button"
                               title="Editar"
                             >
@@ -199,6 +208,16 @@ export default function ExpenseList() {
             setSelectedExpense(null);
           }}
           expense={selectedExpense}
+          onSuccess={loadExpenses}
+        />
+
+        <EditExpenseModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedExpense(null);
+          }}
+          expense={selectedExpense!}
           onSuccess={loadExpenses}
         />
       </div>
