@@ -36,6 +36,7 @@ export interface PurchaseOrder {
   issue_date: string;
   expected_date?: string;
   status: 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
+  payment_status: 'pending' | 'partial' | 'paid';
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
@@ -47,6 +48,7 @@ export interface PurchaseOrder {
   cancelled_reason?: string;
   supplier?: Supplier;
   items?: PurchaseOrderItem[];
+  payments?: PurchasePayment[];
 }
 
 export interface PurchaseOrderItem {
@@ -65,6 +67,21 @@ export interface PurchaseOrderItem {
     name: string;
     code: string;
     unit_measure: string;
+  };
+}
+
+export interface PurchasePayment {
+  id: string;
+  purchase_order_id: string;
+  payment_method_id: string;
+  amount: number;
+  reference_number?: string;
+  payment_date: string;
+  notes?: string;
+  payment_method?: {
+    id: string;
+    name: string;
+    code: string;
   };
 }
 
@@ -188,4 +205,13 @@ export interface MonthlyExpensesByCategory {
   category_name: string;
   total_amount: number;
   expense_count: number;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  requires_reference: boolean;
+  is_active: boolean;
 }

@@ -29,6 +29,10 @@ export default function PurchaseList() {
           items:purchase_order_items(
             *,
             product:purchase_products(*)
+          ),
+          payments:purchase_payments(
+            *,
+            payment_method:payment_methods(*)
           )
         `)
         .order('created_at', { ascending: false });
@@ -173,6 +177,7 @@ export default function PurchaseList() {
                   <th scope="col" className="table-header th">Fecha</th>
                   <th scope="col" className="table-header th text-right">Total</th>
                   <th scope="col" className="table-header th text-center">Estado</th>
+                  <th scope="col" className="table-header th text-center">Estado de Pago</th>
                   <th scope="col" className="relative table-header th">
                     <span className="sr-only">Acciones</span>
                   </th>
@@ -205,6 +210,17 @@ export default function PurchaseList() {
                          purchase.status === 'confirmed' ? 'Confirmada' :
                          purchase.status === 'received' ? 'Recibida' :
                          'Cancelada'}
+                      </span>
+                    </td>
+                    <td className="table-cell text-center">
+                      <span className={`status-badge ${
+                        purchase.payment_status === 'paid' ? 'status-badge-success' :
+                        purchase.payment_status === 'partial' ? 'status-badge-warning' :
+                        'status-badge-error'
+                      }`}>
+                        {purchase.payment_status === 'paid' ? 'Pagada' :
+                         purchase.payment_status === 'partial' ? 'Parcial' :
+                         'Pendiente'}
                       </span>
                     </td>
                     <td className="table-cell-action">
@@ -256,6 +272,7 @@ export default function PurchaseList() {
             setSelectedPurchase(null);
           }}
           purchase={selectedPurchase}
+          onSuccess={loadPurchases}
         />
       </div>
     </div>

@@ -7,31 +7,38 @@ interface CreateSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (supplier: Supplier) => void;
+  editingSupplier?: Supplier | null;
 }
 
 const formSectionClasses = "bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700/50";
 const inputClasses = "mt-1 block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
 const labelClasses = "block text-sm font-medium text-gray-300";
-const sectionTitleClasses = "text-lg font-medium text-white mb-4";
+const sectionTitleClasses = "text-base font-medium text-white mb-4";
 
-export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: CreateSupplierModalProps) {
+export default function CreateSupplierModal({ isOpen, onClose, onSuccess, editingSupplier }: CreateSupplierModalProps) {
   const [formData, setFormData] = useState({
     business_name: '',
     commercial_name: '',
     tax_id: '',
+    industry_sector: '',
     website: '',
-    email: '',
-    phone: '',
     street: '',
     street_number: '',
     city: '',
     state: '',
     postal_code: '',
+    country: 'DO',
+    phone: '',
+    email: '',
     contact_name: '',
     contact_position: '',
     contact_phone: '',
-    payment_terms: 'contado',
+    invoice_type: '',
+    payment_terms: '',
+    preferred_currency: 'DOP',
+    credit_limit: 0,
     notes: '',
+    status: 'active' as const
   });
 
   const [loading, setLoading] = useState(false);
@@ -82,24 +89,10 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
         throw new Error('No authenticated user found');
       }
 
-      // Get the next supplier code using the database function
-      const { data: codeData, error: codeError } = await supabase
-        .rpc('generate_supplier_code');
-
-      if (codeError) {
-        console.error('Error generating supplier code:', codeError);
-        throw new Error('Error al generar el código del proveedor');
-      }
-
-      if (!codeData) {
-        throw new Error('No se pudo generar el código del proveedor');
-      }
-
-      // Create supplier with the generated code
+      // Create supplier - code will be generated automatically by trigger
       const { data: supplier, error: createError } = await supabase
         .from('suppliers')
         .insert([{
-          code: codeData,
           business_name: formData.business_name,
           commercial_name: formData.commercial_name || null,
           tax_id: formData.tax_id,
@@ -111,9 +104,12 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
           contact_name: formData.contact_name || null,
           contact_position: formData.contact_position || null,
           contact_phone: formData.contact_phone || null,
+          invoice_type: formData.invoice_type,
           payment_terms: formData.payment_terms,
+          preferred_currency: formData.preferred_currency,
+          credit_limit: formData.credit_limit,
           notes: formData.notes || null,
-          status: 'active',
+          status: formData.status,
           created_by: user.id
         }])
         .select()
@@ -367,25 +363,86 @@ export default function CreateSupplierModal({ isOpen, onClose, onSuccess }: Crea
               </div>
             </div>
 
-            {/* Payment Terms */}
+            {/* Billing Information */}
             <div className={formSectionClasses}>
-              <h3 className={sectionTitleClasses}>Términos de Pago</h3>
-              <div>
-                <label htmlFor="payment_terms" className={labelClasses}>
-                  Condiciones de Pago
-                </label>
-                <select
-                  id="payment_terms"
-                  value={formData.payment_terms}
-                  onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
-                  className={inputClasses}
-                >
-                  <option value="contado">Contado</option>
-                  <option value="15">15 días</option>
-                  <option value="30">30 días</option>
-                  <option value="45">45 días</option>
-                  <option value="60">60 días</option>
-                </select>
+              <h3 className={sectionTitleClasses}>Información de Facturación</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="invoice_type" className={labelClasses}>
+                    Tipo de Comprobante *
+                  </label>
+                  <select
+                    id="invoice_type"
+                    required
+                    value={formData.invoice_type}
+                    onChange={(e) => setFormData({ ...formData, invoice_type: e.target.value })}
+                    className={inputClasses}
+                  >
+                    <option value="">Seleccione un tipo</option>
+                    <option value="B01">Factura de Crédito Fiscal (B01)</option>
+                    <option value="B02">Factura de Consumo (B02)</option>
+                    <option value="B14">Factura Gubernamental (B14)</option>
+                    <option value="B15">Factura para Exportaciones (B15)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="payment_terms" className={labelClasses}>
+                    Condiciones de Pago *
+                  </label>
+                  <select
+                    id="payment_terms"
+                    required
+                    value={formData.payment_terms}
+                    onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
+                    className={inputClasses}
+                  >
+                    <option value="">Seleccione condición</option>
+                    <option value="contado">Contado</option>
+                    <option value="15">15 días</option>
+                    <option value="30">30 días</option>
+                    <option value="45">45 días</option>
+                    <option value="60">60 días</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="preferred_currency" className={labelClasses}>
+                    Moneda Preferida
+                  </label>
+                  <select
+                    id="preferred_currency"
+                    value={formData.preferred_currency}
+                    onChange={(e) => setFormData({ ...formData, preferred_currency: e.target.value })}
+                    className={inputClasses}
+                  >
+                    <option value="DOP">Peso Dominicano (DOP)</option>
+                    <option value="USD">Dólar Estadounidense (USD)</option>
+                    <option value="EUR">Euro (EUR)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="credit_limit" className={labelClasses}>
+                    Límite de Crédito
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-400 sm:text-sm">
+                        {formData.preferred_currency === 'DOP' ? 'RD$' : formData.preferred_currency === 'USD' ? '$' : '€'}
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      id="credit_limit"
+                      min="0"
+                      step="0.01"
+                      value={formData.credit_limit}
+                      onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
+                      className={`${inputClasses} pl-12`}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

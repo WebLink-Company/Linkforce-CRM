@@ -11,18 +11,26 @@ export default function PayablesList() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [pendingPayables, setPendingPayables] = useState<any[]>([]);
 
   useEffect(() => {
-    loadInvoices();
+    loadData();
   }, []);
 
-  const loadInvoices = async () => {
+  const loadData = async () => {
     try {
-      const { data, error } = await payablesAPI.getSupplierInvoices();
-      if (error) throw error;
-      setInvoices(data || []);
+      setLoading(true);
+      // Load pending payables
+      const { data: pendingData, error: pendingError } = await payablesAPI.getPendingPayables();
+      if (pendingError) throw pendingError;
+      setPendingPayables(pendingData || []);
+
+      // Load all invoices
+      const { data: invoicesData, error: invoicesError } = await payablesAPI.getSupplierInvoices();
+      if (invoicesError) throw invoicesError;
+      setInvoices(invoicesData || []);
     } catch (error) {
-      console.error('Error loading invoices:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
@@ -80,7 +88,7 @@ export default function PayablesList() {
               Filtros
             </button>
             <button
-              onClick={loadInvoices}
+              onClick={loadData}
               className="btn btn-secondary"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -95,7 +103,7 @@ export default function PayablesList() {
             <h3 className="text-lg font-medium leading-6 text-white mb-4">
               Facturas Pendientes de Pago
             </h3>
-            <PendingPayables />
+            <PendingPayables payables={pendingPayables} />
           </div>
         </div>
 
@@ -179,7 +187,7 @@ export default function PayablesList() {
         <CreateSupplierInvoiceModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          onSuccess={loadInvoices}
+          onSuccess={loadData}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, Search, Plus, Filter, RefreshCw, Download, Eye, Trash2, Edit, 
   FileSpreadsheet, DollarSign, Package, Users, Calendar, ArrowUp, ArrowDown, 
@@ -77,6 +77,9 @@ export default function InvoiceList() {
     key: string;
     direction: 'asc' | 'desc';
   }>({ key: 'status', direction: 'asc' });
+
+  // Ref for table container
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const itemsPerPage = 30;
   const currentMonth = new Date().toLocaleString('es-DO', { month: 'long' });
@@ -270,6 +273,14 @@ export default function InvoiceList() {
               inv.status === 'issued'
             );
             break;
+          case 'overdue':
+            const today = new Date();
+            filteredData = filteredData.filter(inv => 
+              inv.status === 'issued' &&
+              inv.payment_status !== 'paid' &&
+              new Date(inv.due_date) < today
+            );
+            break;
           case 'voided':
             filteredData = filteredData.filter(inv => 
               inv.status === 'voided'
@@ -329,6 +340,17 @@ export default function InvoiceList() {
       }
 
       setInvoices(filteredData);
+
+      // Scroll to table after filtering
+      if (activeFilter && tableRef.current) {
+        const yOffset = -100; // Offset to leave some space at the top
+        const y = tableRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        
+        window.scrollTo({
+          top: y,
+          behavior: 'smooth'
+        });
+      }
     } catch (error) {
       console.error('Error loading invoices:', error);
     } finally {
@@ -457,6 +479,8 @@ export default function InvoiceList() {
         return `Facturas Cobradas de ${currentMonth}`;
       case 'pending':
         return `Facturas por Cobrar de ${currentMonth}`;
+      case 'overdue':
+        return 'Facturas Vencidas';
       case 'voided':
         return `Facturas Anuladas`;
       case 'history':
@@ -529,7 +553,7 @@ export default function InvoiceList() {
           setDateRange={setDateRange}
         />
 
-        <div className="mt-8">
+        <div className="mt-8" ref={tableRef}>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex-1">
               <div className="relative">
@@ -541,7 +565,7 @@ export default function InvoiceList() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar facturas..."
-                  className="form-input pl-10 w-full"
+                  className="form-input pl-10"
                 />
               </div>
             </div>
@@ -566,9 +590,6 @@ export default function InvoiceList() {
           {/* Results count with filter description */}
           <div className="mb-4 text-sm text-gray-400">
             Mostrando {paginatedInvoices.length} de {filteredInvoices.length} {getFilterDescription()}
-            {dateRange.startDate && dateRange.endDate && (
-              <> del {new Date(dateRange.startDate).toLocaleDateString()} al {new Date(dateRange.endDate).toLocaleDateString()}</>
-            )}
           </div>
 
           <InvoiceTable

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Supplier } from '../../types/payables';
-import CreatePurchaseProductModal from './CreatePurchaseProductModal';
+import CreateSupplierModal from '../suppliers/CreateSupplierModal';
+import SupplierTypeDialog from '../suppliers/SupplierTypeDialog';
 
 interface CreatePurchaseModalProps {
   isOpen: boolean;
@@ -12,7 +13,6 @@ interface CreatePurchaseModalProps {
 
 export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: CreatePurchaseModalProps) {
   const [formData, setFormData] = useState({
-    number: '', // Added manual order number field
     supplier_id: '',
     issue_date: new Date().toISOString().split('T')[0],
     expected_date: '',
@@ -34,7 +34,8 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
   const [totals, setTotals] = useState({
     subtotal: 0,
     tax_amount: 0,
@@ -112,16 +113,24 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
         throw new Error('No authenticated user found');
       }
 
-      // Validate order number format if provided
-      if (formData.number && !/^PO-\d{4}-\d{6}$/.test(formData.number)) {
-        throw new Error('El número de orden debe tener el formato: PO-YYYY-XXXXXX');
+      // Get the next purchase order number using the database function
+      const { data: number, error: numberError } = await supabase
+        .rpc('generate_po_number');
+
+      if (numberError) {
+        console.error('Error generating purchase order number:', numberError);
+        throw new Error('Error al generar el número de orden de compra');
       }
 
-      // Create purchase order
+      if (!number) {
+        throw new Error('No se pudo generar el número de orden de compra');
+      }
+
+      // Create purchase order with the generated number
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert([{
-          number: formData.number || undefined, // Only send if provided
+          number,
           supplier_id: formData.supplier_id,
           issue_date: formData.issue_date,
           expected_date: formData.expected_date || null,
@@ -211,6 +220,17 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
     setItems(newItems);
   };
 
+  const handleSupplierTypeSelect = (type: 'regular' | 'corporate') => {
+    setShowTypeDialog(false);
+    setShowCreateModal(true);
+  };
+
+  const handleSupplierCreated = (supplier: Supplier) => {
+    setSuppliers(prev => [...prev, supplier]);
+    setFormData(prev => ({ ...prev, supplier_id: supplier.id }));
+    setShowCreateModal(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -241,32 +261,20 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
-              <h3 className="text-sm font-medium text-white">Información Básica</h3>
-              
-              {/* Manual Order Number Field */}
               <div>
-                <label htmlFor="number" className="block text-sm font-medium text-gray-300">
-                  Número de Orden (Opcional)
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    id="number"
-                    value={formData.number}
-                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                    placeholder="PO-YYYY-XXXXXX"
-                    className="block w-full rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
-                  />
-                  <p className="mt-1 text-sm text-gray-400">
-                    Formato: PO-YYYY-XXXXXX (se generará automáticamente si se deja en blanco)
-                  </p>
+                <div className="flex justify-between items-center mb-1">
+                  <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
+                    Proveedor *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowTypeDialog(true)}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuevo Proveedor
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
-                  Proveedor *
-                </label>
                 <select
                   id="supplier_id"
                   required
@@ -316,17 +324,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
             {/* Items */}
             <div className="bg-gray-800/50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-sm font-medium text-white">Productos *</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateProductModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Crear Producto
-                  </button>
-                </div>
+                <h3 className="text-sm font-medium text-white">Productos *</h3>
                 <button
                   type="button"
                   onClick={addItem}
@@ -522,13 +520,16 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
         </form>
       </div>
 
-      <CreatePurchaseProductModal
-        isOpen={showCreateProductModal}
-        onClose={() => setShowCreateProductModal(false)}
-        onSuccess={() => {
-          setShowCreateProductModal(false);
-          loadProducts();
-        }}
+      <SupplierTypeDialog
+        isOpen={showTypeDialog}
+        onClose={() => setShowTypeDialog(false)}
+        onSelectType={handleSupplierTypeSelect}
+      />
+
+      <CreateSupplierModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleSupplierCreated}
       />
     </div>
   );

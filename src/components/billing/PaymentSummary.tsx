@@ -18,11 +18,11 @@ export default function PaymentSummary({ invoice, onPaymentClick }: PaymentSumma
   }
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
+      <div className="space-y-4">
         <div>
-          <p className="text-sm text-gray-500">Total Facturado</p>
-          <p className="text-lg font-semibold">
+          <p className="text-sm text-gray-400">Total Facturado</p>
+          <p className="text-lg font-semibold text-white">
             {new Intl.NumberFormat('es-DO', {
               style: 'currency',
               currency: 'DOP'
@@ -30,20 +30,17 @@ export default function PaymentSummary({ invoice, onPaymentClick }: PaymentSumma
           </p>
         </div>
         <div>
-          <p className="text-sm text-gray-500">Total Pagado</p>
-          <p className="text-lg font-semibold text-green-600">
+          <p className="text-sm text-gray-400">Total Pagado</p>
+          <p className="text-lg font-semibold text-emerald-400">
             {new Intl.NumberFormat('es-DO', {
               style: 'currency',
               currency: 'DOP'
             }).format(totalPaid)}
           </p>
         </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-500">Monto Pendiente</p>
-          <p className={`text-lg font-semibold ${remainingAmount > 0 ? 'text-blue-600' : 'text-green-600'}`}>
+        <div>
+          <p className="text-sm text-gray-400">Monto Pendiente</p>
+          <p className="text-lg font-semibold text-blue-400">
             {new Intl.NumberFormat('es-DO', {
               style: 'currency',
               currency: 'DOP'
@@ -52,22 +49,22 @@ export default function PaymentSummary({ invoice, onPaymentClick }: PaymentSumma
         </div>
 
         {isOverdue && (
-          <div className="mt-2 flex items-center text-red-600 text-sm">
+          <div className="flex items-center text-red-400 text-sm bg-red-500/10 p-2 rounded-md border border-red-500/20">
             <AlertCircle className="h-4 w-4 mr-1" />
             Factura vencida
           </div>
         )}
-      </div>
 
-      {remainingAmount > 0 && invoice.status !== 'voided' && (
-        <button
-          onClick={onPaymentClick}
-          className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <DollarSign className="h-4 w-4 mr-2" />
-          Registrar Pago
-        </button>
-      )}
+        {remainingAmount > 0 && invoice.status !== 'voided' && (
+          <button
+            onClick={onPaymentClick}
+            className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            <DollarSign className="h-4 w-4 mr-2" />
+            Registrar Pago
+          </button>
+        )}
+      </div>
     </div>
   );
 }

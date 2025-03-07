@@ -38,7 +38,7 @@ class FinanceAPI extends BaseAPI {
       // First get the account ID from the code
       const { data: account, error: accountError } = await supabase
         .from('accounts')
-        .select('id')
+        .select('id, type')
         .eq('code', accountCode)
         .single();
 
@@ -51,11 +51,24 @@ class FinanceAPI extends BaseAPI {
         throw new Error('Account not found');
       }
 
+      // Get movements from account_movements table with proper joins
       let query = supabase
         .from('account_movements')
         .select(`
-          *,
-          account:accounts(*)
+          id,
+          date,
+          type,
+          amount,
+          description,
+          reference_type,
+          reference_id,
+          created_at,
+          created_by,
+          account:accounts!inner(
+            id,
+            code,
+            name
+          )
         `)
         .eq('account_id', account.id)
         .order('date', { ascending: false });
@@ -67,10 +80,48 @@ class FinanceAPI extends BaseAPI {
         query = query.lte('date', endDate);
       }
 
-      const { data, error } = await query;
+      const { data: movements, error: movementsError } = await query;
       
-      if (error) throw error;
-      return { data, error: null };
+      if (movementsError) throw movementsError;
+
+      // Get additional reference details if needed
+      const enrichedMovements = await Promise.all((movements || []).map(async (movement) => {
+        let referenceDetails = null;
+
+        if (movement.reference_type === 'expense') {
+          const { data: expense } = await supabase
+            .from('expenses')
+            .select(`
+              number,
+              description,
+              category:expense_categories(name),
+              supplier:suppliers(business_name)
+            `)
+            .eq('id', movement.reference_id)
+            .single();
+
+          if (expense) {
+            referenceDetails = {
+              number: expense.number,
+              description: expense.description,
+              category: expense.category?.name,
+              supplier: expense.supplier?.business_name
+            };
+          }
+        }
+
+        return {
+          ...movement,
+          description: referenceDetails ? 
+            `${referenceDetails.number} - ${referenceDetails.description} ${
+              referenceDetails.supplier ? `(${referenceDetails.supplier})` : ''
+            }` : 
+            movement.description,
+          category: referenceDetails?.category
+        };
+      }));
+
+      return { data: enrichedMovements, error: null };
     } catch (error) {
       console.error('Error in getAccountMovements:', error);
       return { data: null, error };
@@ -82,7 +133,7 @@ class FinanceAPI extends BaseAPI {
     try {
       console.log('Getting balance for account:', accountCode, 'as of:', asOfDate);
       
-      // First get the account ID from the code
+      // Get account ID
       const { data: account, error: accountError } = await supabase
         .from('accounts')
         .select('id, type')
@@ -98,15 +149,40 @@ class FinanceAPI extends BaseAPI {
         throw new Error('Account not found');
       }
 
-      const { data: balanceData, error: balanceError } = await supabase
-        .rpc('get_account_balance', {
-          p_account_id: account.id,
-          p_as_of_date: asOfDate
-        });
+      // Calculate balance from account_movements
+      const { data: movements, error: movementsError } = await supabase
+        .from('account_movements')
+        .select('type, amount')
+        .eq('account_id', account.id)
+        .lte('date', asOfDate);
 
-      if (balanceError) throw balanceError;
+      if (movementsError) throw movementsError;
 
-      return { data: balanceData, error: null };
+      // Calculate balance based on debits and credits
+      // For asset and expense accounts:
+      //   - Debit increases the balance
+      //   - Credit decreases the balance
+      // For liability, equity, and revenue accounts:
+      //   - Credit increases the balance
+      //   - Debit decreases the balance
+      const isDebitNormal = ['asset', 'expense'].includes(account.type);
+      
+      const balance = movements?.reduce((sum, movement) => {
+        const amount = movement.amount;
+        if (movement.type === 'debit') {
+          return sum + (isDebitNormal ? amount : -amount);
+        } else {
+          return sum + (isDebitNormal ? -amount : amount);
+        }
+      }, 0) || 0;
+
+      return {
+        data: {
+          balance,
+          as_of_date: asOfDate
+        },
+        error: null
+      };
     } catch (error) {
       console.error('Error in getAccountBalance:', error);
       return { data: null, error };
@@ -190,6 +266,18 @@ class FinanceAPI extends BaseAPI {
         p_end_date: endDate
       });
     return { data, error };
+  }
+
+  // Get pending payables
+  async getPendingPayables() {
+    try {
+      const { data, error } = await supabase.rpc('get_pending_payables');
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error getting pending payables:', error);
+      return { data: null, error };
+    }
   }
 }
 

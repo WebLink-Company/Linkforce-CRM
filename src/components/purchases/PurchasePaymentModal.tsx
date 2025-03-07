@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Receipt, Calendar } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import type { Invoice } from '../../types/billing';
+import { purchasesAPI } from '../../lib/api/purchases';
+import { financeAPI } from '../../lib/api/finance';
+import type { PurchaseOrder, PaymentMethod } from '../../types/payables';
 
-interface PaymentModalProps {
+interface PurchasePaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  invoice: Invoice;
+  purchase: PurchaseOrder;
 }
 
-export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: PaymentModalProps) {
+export default function PurchasePaymentModal({ isOpen, onClose, onSuccess, purchase }: PurchasePaymentModalProps) {
   const [formData, setFormData] = useState({
     payment_method_id: '',
     amount: 0,
@@ -19,7 +20,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     notes: '',
   });
 
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,24 +28,18 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     if (isOpen) {
       loadPaymentMethods();
       // Set initial amount to remaining balance
-      const remainingAmount = invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
+      const remainingAmount = purchase.total_amount - (purchase.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
       setFormData(prev => ({ ...prev, amount: remainingAmount }));
     }
-  }, [isOpen, invoice]);
+  }, [isOpen, purchase]);
 
   const loadPaymentMethods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setPaymentMethods(data || []);
-    } catch (error) {
+    const { data, error } = await financeAPI.getPaymentMethods();
+    if (error) {
       console.error('Error loading payment methods:', error);
+      return;
     }
+    setPaymentMethods(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,82 +48,18 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('No authenticated user found');
-      }
+      const { success, error } = await purchasesAPI.createPayment(
+        purchase.id,
+        formData
+      );
 
-      // Calculate current total paid
-      const currentPaid = invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-      const newTotal = currentPaid + formData.amount;
-
-      // Check if payment would exceed invoice total
-      if (newTotal > invoice.total_amount) {
-        throw new Error('El monto del pago excede el balance pendiente');
-      }
-
-      // Get cash account ID
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('code', '1100')
-        .single();
-
-      if (accountError) throw accountError;
-      if (!account) throw new Error('No se encontró la cuenta de efectivo');
-
-      // Create payment
-      const { data: payment, error: paymentError } = await supabase
-        .from('payments')
-        .insert([{
-          invoice_id: invoice.id,
-          payment_method_id: formData.payment_method_id,
-          amount: formData.amount,
-          reference_number: formData.reference_number,
-          payment_date: formData.payment_date,
-          notes: formData.notes,
-          created_by: user.id
-        }])
-        .select()
-        .single();
-
-      if (paymentError) throw paymentError;
-
-      // Update invoice payment status
-      const newStatus = newTotal >= invoice.total_amount ? 'paid' : 'partial';
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({ 
-          payment_status: newStatus,
-          status: 'issued', // Ensure status remains 'issued'
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', invoice.id);
-
-      if (updateError) throw updateError;
-
-      // Create accounting movement
-      const { error: accountingError } = await supabase
-        .from('account_movements')
-        .insert([{
-          account_id: account.id,
-          date: formData.payment_date,
-          type: 'debit',
-          amount: formData.amount,
-          reference_type: 'payment',
-          reference_id: payment.id,
-          description: `Pago factura ${invoice.ncf}`,
-          created_by: user.id
-        }]);
-
-      if (accountingError) throw accountingError;
+      if (!success) throw error;
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error processing payment:', error);
-      setError(error instanceof Error ? error.message : 'Error al procesar el pago');
+      setError(error instanceof Error ? error.message : 'Error processing payment');
     } finally {
       setLoading(false);
     }
@@ -137,19 +68,19 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
   if (!isOpen) return null;
 
   const selectedMethod = paymentMethods.find(m => m.id === formData.payment_method_id);
-  const remainingAmount = invoice.total_amount - (invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
+  const remainingAmount = purchase.total_amount - (purchase.payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
 
-  // If invoice is fully paid, don't allow more payments
+  // If purchase is fully paid, don't allow more payments
   if (remainingAmount <= 0) {
     return (
       <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[70]">
         <div className="relative bg-gray-900/95 backdrop-blur-sm rounded-lg w-full max-w-md border border-white/10">
           <div className="p-6 text-center">
             <h3 className="text-lg font-medium text-white mb-4">
-              Factura Pagada
+              Orden de Compra Pagada
             </h3>
             <p className="text-gray-400 mb-6">
-              Esta factura ya ha sido pagada en su totalidad.
+              Esta orden de compra ya ha sido pagada en su totalidad.
             </p>
             <button
               onClick={onClose}
@@ -184,33 +115,33 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <form id="payment-form" onSubmit={handleSubmit}>
-            {error && (
-              <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
-                <p className="text-sm text-red-400">{error}</p>
-              </div>
-            )}
+          {error && (
+            <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-md">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
 
+          <form id="payment-form" onSubmit={handleSubmit}>
             <div className="space-y-6">
-              {/* Invoice Summary */}
+              {/* Purchase Order Summary */}
               <div className="bg-gray-800/50 p-4 rounded-lg border border-white/10">
-                <h3 className="text-sm font-medium text-gray-300 mb-2">Resumen de Factura</h3>
+                <h3 className="text-sm font-medium text-gray-300 mb-2">Resumen de Orden</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-400">NCF</p>
-                    <p className="font-medium text-white">{invoice.ncf}</p>
+                    <p className="text-gray-400">Número</p>
+                    <p className="font-medium text-white">{purchase.number}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Cliente</p>
-                    <p className="font-medium text-white">{invoice.customer?.full_name}</p>
+                    <p className="text-gray-400">Proveedor</p>
+                    <p className="font-medium text-white">{purchase.supplier?.business_name}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Total Factura</p>
+                    <p className="text-gray-400">Total Orden</p>
                     <p className="font-medium text-white">
                       {new Intl.NumberFormat('es-DO', {
                         style: 'currency',
                         currency: 'DOP'
-                      }).format(invoice.total_amount)}
+                      }).format(purchase.total_amount)}
                     </p>
                   </div>
                   <div>
@@ -262,7 +193,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                     step="0.01"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                    className="block w-full pl-10 pr-12 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                    className="block w-full pl-10 pr-12 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                     placeholder="0.00"
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -286,7 +217,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                       required
                       value={formData.reference_number}
                       onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                      className="block w-full pl-10 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                      className="block w-full pl-10 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                       placeholder="Número de confirmación"
                     />
                   </div>
@@ -307,7 +238,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, invoice }: Pa
                     required
                     value={formData.payment_date}
                     onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                    className="block w-full pl-10 bg-gray-700/50 border-gray-600/50 text-white rounded-md focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                    className="block w-full pl-10 rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
                   />
                 </div>
               </div>

@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { AlertTriangle, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { financeAPI } from '../../lib/api/finance';
-import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 interface AccountMovementsProps {
   accountId: string;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
-export default function AccountMovements({ accountId }: AccountMovementsProps) {
-  const [movements, setMovements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
+export default function AccountMovements({ accountId, dateRange, onDateRangeChange }: AccountMovementsProps) {
+  const [movements, setMovements] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (accountId) {
       loadMovements();
     }
@@ -25,7 +26,6 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
     setLoading(true);
     setError(null);
     try {
-      console.log('Loading movements for account:', accountId);
       const { data, error } = await financeAPI.getAccountMovements(
         accountId,
         dateRange.startDate,
@@ -91,7 +91,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
               type="date"
               id="startDate"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+              onChange={(e) => onDateRangeChange({ ...dateRange, startDate: e.target.value })}
               className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>
@@ -101,7 +101,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
               type="date"
               id="endDate"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+              onChange={(e) => onDateRangeChange({ ...dateRange, endDate: e.target.value })}
               className="mt-1 block rounded-md bg-gray-700/50 border-gray-600/50 text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
             />
           </div>
@@ -112,30 +112,24 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
         <table className="min-w-full divide-y divide-white/10">
           <thead className="bg-gray-900/50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Fecha
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Descripción
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Débito
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Crédito
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Balance
-              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Fecha</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Descripción</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Débito</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Crédito</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-gray-800/30">
             {movementsWithBalance.map((movement) => (
               <tr key={movement.id} className="hover:bg-gray-700/30">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                  {new Date(movement.date).toLocaleDateString()}
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
+                  {new Date(movement.date).toLocaleDateString('es-DO', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-300">
+                <td className="px-4 py-4 text-sm text-gray-300">
                   <div className="flex items-center">
                     {movement.type === 'debit' ? (
                       <ArrowUpRight className="h-4 w-4 text-red-400 mr-2" />
@@ -144,8 +138,13 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
                     )}
                     {movement.description}
                   </div>
+                  {movement.category && (
+                    <span className="text-xs text-gray-400 ml-6">
+                      Categoría: {movement.category}
+                    </span>
+                  )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'debit' ? (
                     <span className="text-red-400">
                       {new Intl.NumberFormat('es-DO', {
@@ -155,7 +154,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
                     </span>
                   ) : ''}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                   {movement.type === 'credit' ? (
                     <span className="text-emerald-400">
                       {new Intl.NumberFormat('es-DO', {
@@ -165,7 +164,7 @@ export default function AccountMovements({ accountId }: AccountMovementsProps) {
                     </span>
                   ) : ''}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-white">
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-medium text-white">
                   {new Intl.NumberFormat('es-DO', {
                     style: 'currency',
                     currency: 'DOP'
