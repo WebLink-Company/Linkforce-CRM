@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Supplier } from '../../types/payables';
-import CreatePurchaseProductModal from './CreatePurchaseProductModal';
+import CreateSupplierModal from '../suppliers/CreateSupplierModal';
+import SupplierTypeDialog from '../suppliers/SupplierTypeDialog';
 
 interface CreatePurchaseModalProps {
   isOpen: boolean;
@@ -33,7 +34,8 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
   const [totals, setTotals] = useState({
     subtotal: 0,
     tax_amount: 0,
@@ -218,6 +220,17 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
     setItems(newItems);
   };
 
+  const handleSupplierTypeSelect = (type: 'regular' | 'corporate') => {
+    setShowTypeDialog(false);
+    setShowCreateModal(true);
+  };
+
+  const handleSupplierCreated = (supplier: Supplier) => {
+    setSuppliers(prev => [...prev, supplier]);
+    setFormData(prev => ({ ...prev, supplier_id: supplier.id }));
+    setShowCreateModal(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -248,12 +261,20 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
-              <h3 className="text-sm font-medium text-white">Información Básica</h3>
-              
               <div>
-                <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
-                  Proveedor *
-                </label>
+                <div className="flex justify-between items-center mb-1">
+                  <label htmlFor="supplier_id" className="block text-sm font-medium text-gray-300">
+                    Proveedor *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowTypeDialog(true)}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuevo Proveedor
+                  </button>
+                </div>
                 <select
                   id="supplier_id"
                   required
@@ -303,17 +324,7 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
             {/* Items */}
             <div className="bg-gray-800/50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-sm font-medium text-white">Productos *</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateProductModal(true)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Crear Producto
-                  </button>
-                </div>
+                <h3 className="text-sm font-medium text-white">Productos *</h3>
                 <button
                   type="button"
                   onClick={addItem}
@@ -509,13 +520,16 @@ export default function CreatePurchaseModal({ isOpen, onClose, onSuccess }: Crea
         </form>
       </div>
 
-      <CreatePurchaseProductModal
-        isOpen={showCreateProductModal}
-        onClose={() => setShowCreateProductModal(false)}
-        onSuccess={() => {
-          setShowCreateProductModal(false);
-          loadProducts();
-        }}
+      <SupplierTypeDialog
+        isOpen={showTypeDialog}
+        onClose={() => setShowTypeDialog(false)}
+        onSelectType={handleSupplierTypeSelect}
+      />
+
+      <CreateSupplierModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleSupplierCreated}
       />
     </div>
   );
