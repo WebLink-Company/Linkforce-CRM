@@ -17,6 +17,7 @@ import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
 import RawMaterialList from './components/inventory/RawMaterialList';
 import PurchaseList from './components/purchases/PurchaseList';
+import PurchaseProductList from './components/purchases/PurchaseProductList'; // Add this import
 import SupplierList from './components/suppliers/SupplierList';
 
 export default function App() {
@@ -171,6 +172,16 @@ export default function App() {
           user ? (
             <Layout>
               <PurchaseList />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+
+        <Route path="/compras/productos" element={
+          user ? (
+            <Layout>
+              <PurchaseProductList />
             </Layout>
           ) : (
             <Navigate to="/login" replace />

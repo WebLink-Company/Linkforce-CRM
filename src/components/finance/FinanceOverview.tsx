@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { financeAPI } from '../../lib/api/finance';
 import { 
   DollarSign, BarChart, Plus, Wallet, Calculator, ChevronDown, ChevronUp,
-  FilePieChart, FileDown, Printer 
+  FilePieChart, FileDown, Printer, Receipt 
 } from 'lucide-react';
 import AccountSelector from './AccountSelector';
 import AccountMovements from './AccountMovements';
@@ -18,6 +18,10 @@ export default function FinanceOverview() {
   const [error, setError] = useState<string | null>(null);
   const [showReceivables, setShowReceivables] = useState(true);
   const [showPayables, setShowPayables] = useState(true);
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+  });
 
   // Define main accounts to show balances for
   const mainAccounts = [
@@ -25,11 +29,18 @@ export default function FinanceOverview() {
     { code: '1200', name: 'Cuentas por Cobrar', icon: Calculator },
     { code: '2100', name: 'Cuentas por Pagar', icon: DollarSign },
     { code: '4000', name: 'Ingresos', icon: BarChart },
+    { code: '5000', name: 'Gastos', icon: Receipt }
   ];
 
   useEffect(() => {
     loadAccountBalances();
-  }, []);
+  }, [dateRange]);
+
+  useEffect(() => {
+    if (selectedAccount) {
+      loadAccountBalance(selectedAccount);
+    }
+  }, [selectedAccount, dateRange]);
 
   const loadAccountBalances = async () => {
     setLoading(true);
@@ -41,7 +52,7 @@ export default function FinanceOverview() {
       for (const account of mainAccounts) {
         const { data, error } = await financeAPI.getAccountBalance(
           account.code,
-          new Date().toISOString().split('T')[0]
+          dateRange.endDate
         );
         
         if (error) throw error;
@@ -54,6 +65,25 @@ export default function FinanceOverview() {
       setError(error instanceof Error ? error.message : 'Error loading account balances');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAccountBalance = async (accountCode: string) => {
+    try {
+      const { data, error } = await financeAPI.getAccountBalance(
+        accountCode,
+        dateRange.endDate
+      );
+      
+      if (error) throw error;
+      
+      setAccountBalances(prev => ({
+        ...prev,
+        [accountCode]: data?.balance || 0
+      }));
+    } catch (error) {
+      console.error('Error loading account balance:', error);
+      setError(error instanceof Error ? error.message : 'Error loading account balance');
     }
   };
 
@@ -148,7 +178,7 @@ export default function FinanceOverview() {
         </div>
 
         {/* Account Balance Cards */}
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {mainAccounts.map((account) => {
             const Icon = account.icon;
             const balance = accountBalances[account.code] || 0;
@@ -205,7 +235,11 @@ export default function FinanceOverview() {
                   </p>
                 </div>
 
-                <AccountMovements accountId={selectedAccount} />
+                <AccountMovements 
+                  accountId={selectedAccount}
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
               </>
             )}
           </div>
